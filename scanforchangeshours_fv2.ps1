@@ -95,7 +95,7 @@ function doScanfor {
 
     # create a filter for common noisy dirs with changes not of interest. Note even with filter highlited files will intentionaly show up
     if ($dofilter -ieq 'Y' ) {
-        & { # should be a function but can't be because this is kicked off as a job in a seperate thread and it cannot functions outside the thread
+        &{ # should be a function but can't be because this is kicked off as a job in a seperate thread and it cannot functions outside the thread
             # Used in a filter so any dirs need to have \ escaped to \\ also other special characters e.g. \(\)
             $patsp = "|" 
             $winddir = $env:WINDIR.Replace("\", "\\") + "\\"
@@ -104,7 +104,7 @@ function doScanfor {
             $tempRot = $(Split-Path -Path $env:TEMP -Parent).Replace("\", "\\")
             $tempusr = $env:TMP.Replace("\", "\\")
             $prgfles = $env:ProgramFiles.Replace("\", "\\")
-            $prgfl86 = ([System.Environment]::GetFolderPath("ProgramFilesX86").Replace("\", "\\") + "\\").Replace("(", "\(").Replace(")", "\)")
+            $prgfl86 = ([System.Environment]::GetFolderPath("ProgramFilesX86").Replace("\", "\\")).Replace("(", "\(").Replace(")", "\)")
             $pgmdata = [System.Environment]::GetFolderPath("CommonApplicationData").Replace("\", "\\") 
 
             # Add others here as required
@@ -177,11 +177,24 @@ function doScanfor {
                 $textfilterpat +=  $drive[0] + ":\\SteamLibrary\\steamapps\\common" + $patsp
                 $textfilterpat += "  0 " + $drive[0]+ ":\\"+ $patsp # filter out zero lenght files, special case
             }
+
+            # anything inside this block cannot modify anything outside it. It behaves like a function due to &{
+            # use $script to acces the var outside it
+            $script:textfilterpat = $textfilterpat
         }
     }
 
     # filter out the output file from the result
     $textfilterpat += $outfile.Replace("\", "\\")
+
+    # For DEBUGGING (requires C drive or ALL is used)
+    &{
+        if ($drivefull -eq "C:\*") { # only write it out once
+            $dwdir = (New-Object -ComObject Shell.Application).NameSpace('shell:Downloads').Self.Path
+            $dboutfn = $dwdir + "\" + "filter_" + $dofilter + ".txt"
+            $textfilterpat | Add-Content -Path $dboutfn
+        }
+    }
 
     # Do the Scan
     # Build dynamic Get-ChildItem parameters
@@ -714,9 +727,6 @@ function Invoke-DriveScan {
 # Main 
 #
 
-# FOR DEBUGGING show details of the enviroment
-# Show-EnvironmentCheck 
-
 $hourstocheck = $null
 $FilterApp = $null
 $WhichDrive = $null
@@ -725,7 +735,6 @@ $Drives = Get-CimInstance -ClassName Win32_LogicalDisk -Filter "DriveType=3" | F
 $OutputFile = $dwdir + "\result.txt"
 $ExtsToHilight = @(".exe", ".bat", ".pdf", ".jpg", ".png", ".docx", ".mp4", ".tif", ".tiff", ".webp", ".afphoto", ".psd", ".pic", ".jpeg")
 
-"Results of Scan for modified files:" | Set-Content -Path $OutputFile -Force
 [console]::bufferwidth = 30000
 
 clearpressedkeys
@@ -796,6 +805,9 @@ if ($CopyHighlights -ieq 'Y') {
 
 $TransLog = New-TemporaryFile
 Start-Transcript -Path $TransLog -Append | Out-Null
+
+# FOR DEBUGGING show details of the enviroment
+# Show-EnvironmentCheck 
 
 # Do Clean
 if ( $cleantempfiles -ieq 'Y' ) { 
