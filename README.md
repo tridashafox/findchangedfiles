@@ -36,21 +36,21 @@ The script can search for different file types and provides these functions:
 
 The script will ask for all the options, or they can be passed as switches on the command line. They are:
 
-| Parameter               | Description |
-|-------------------------|-------------|
-| `-ModDefault`           | `'Y'` means the parameter **modifies the default value**, rather than setting it. Default: `'N'`. |
-| `-CleanTempFiles`       | `'Y'` to run **Windows Disk Cleanup (cleanmgr.exe)** before scanning. Default: `'N'`. |
-| `-HoursToCheck`         | Number of **hours to look back** for changes. Must be negative. Default: `-3`. |
-| `-WhichDrive`           | Specify the **drive letter** to scan (e.g., `'C'`) or `'ALL'` to scan all drives. Default: `'ALL'`. |
-| `-CheckFor`             | File types to check for: `'ALL'`, `'IMG'`, `'PNG'`, `'EXE'`. Default: `'ALL'`. |
-| `-CheckHidden`          | `'Y'` to include **hidden files** in the scan (may be slower). Default: `'Y'`. |
-| `-CheckForSizeMin`      | Minimum file size (in bytes) to include. Default: `0` (no minimum). |
-| `-CheckForSizeMax`      | Maximum file size (in bytes) to include. Default: `-1` (no limit). |
-| `-FilterApp`            | `'Y'` to apply built-in filters to reduce noise. Default: `'Y'` if `CheckFor` is `'ALL'`, otherwise `'N'`. |
-| `-ShowHighlights`       | `'Y'` to **highlight key changed file types** at the end of the scan. Default: `'Y'`. |
-| `-CopyHighlights`       | `'Y'` to **copy highlighted files** to a temporary folder in the Downloads directory. |
-| `-CopyMetaInfo`         | `'Y'` to create a `.meta.json` file with path/info for each copied file. |
-| `-CopyReportErrors`     | `'Y'` to **log copy errors** during the highlight operation into the results file. |
+| Parameter                  | Description |
+|----------------------------|-------------|
+| `-ModDefault`              | `'Y'` means the parameter **modifies the default value**, rather than setting it. Default: `'N'`. |
+| `-CleanTempFiles`          | `'Y'` to run **Windows Disk Cleanup (cleanmgr.exe)** before scanning. Default: `'N'`. |
+| `-HoursToCheck`            | Number of **hours to look back** for changes. Must be negative. Default: `-3`. |
+| `-WhichDrive`              | Specify the **drive letter** to scan (e.g., `'C'`) or `'ALL'` to scan all drives. Default: `'ALL'`. |
+| `-CheckFor`                | File types to check for: `'ALL'`, `'IMG'`, `'PNG'`, `'EXE'`. Default: `'ALL'`. |
+| `-CheckHidden`             | `'Y'` to include **hidden files** in the scan (may be slower). Default: `'Y'`. |
+| `-CheckForSizeMin`         | Minimum file size (in bytes) to include. Default: `0` (no minimum). |
+| `-CheckForSizeMax`         | Maximum file size (in bytes) to include. Default: `-1` (no limit). |
+| `-FilterApp`               | `'Y'` to apply built-in filters to reduce noise. Default: `'Y'` if `CheckFor` is `'ALL'`, otherwise `'N'`. |
+| `-ShowHighlights`          | `'Y'` to **highlight key changed file types** at the end of the scan. Default: `'Y'`. |
+| `-CopyHighlights`          | `'Y'` to **copy highlighted files** to a temporary folder in the Downloads directory. |
+| `-CopyMetaInfo`            | `'Y'` to create a `.meta.json` file with path/info for each copied file. |
+| `-CopyReportErrors`        | `'Y'` to **log copy errors** during the highlight operation into the results file. |
 
 ### Example 1 - will run with no prompting
 
