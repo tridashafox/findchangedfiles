@@ -188,6 +188,7 @@ function doScanfor {
     $textfilterpat += $outfile.Replace("\", "\\")
 
     # For DEBUGGING (requires C drive or ALL is used)
+    <#
     &{
         if ($drivefull -eq "C:\*") { # only write it out once
             $dwdir = (New-Object -ComObject Shell.Application).NameSpace('shell:Downloads').Self.Path
@@ -195,6 +196,7 @@ function doScanfor {
             $textfilterpat | Add-Content -Path $dboutfn
         }
     }
+    #>
 
     # Do the Scan
     # Build dynamic Get-ChildItem parameters
