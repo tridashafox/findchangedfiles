@@ -480,6 +480,33 @@ function createoutputdir {
 }
 
 ########################################################################
+# remove junk transript log adds at start and end and add to output file
+#
+function addtranslogtoutput {
+    param (
+        [Parameter(Mandatory = $true)] [string]$TransLog,
+        [Parameter(Mandatory = $true)] [string]$OutputFile
+    )
+
+    # Trim last 4 lines of transcript
+    (Get-Content $TransLog | Select-Object -SkipLast 4) | Set-Content $TransLog
+
+    # Filter from first [INFO] line onward
+    $lines = [System.Collections.Generic.List[string]](Get-Content $TransLog)
+    $startIndex = $lines.FindIndex({ param($line) $line -match '\[INFO\]' })
+    if ($startIndex -ge 0) {
+        $lines.GetRange($startIndex, $lines.Count - $startIndex) | Set-Content $TransLog
+    }
+
+    # Merge transcript + output
+    $transContent  = Get-Content -Path $TransLog
+    $outputContent = Get-Content -Path $OutputFile
+    $combined      = $transContent + @("") + $outputContent
+    $combined | Set-Content -Path $OutputFile
+}
+
+
+########################################################################
 # moves the output result file to the output directory
 #
 function relocateoutput {
@@ -683,7 +710,6 @@ function Invoke-DriveScan {
     }
 }
 
-
 #################################################
 # Main 
 #
@@ -828,32 +854,20 @@ if ( $ShowHighlights -ieq 'Y' ) {
     findfilestohighlight -outfile $OutputFile -unfall $TempUFAll -copytodw $CopyHighlights -copyrpterr $CopyReportErrors -resfolder $resfldpath -fnsep $fndirsep -CopyMetaInfo $CopyMetaInfo
 }
 
+if (-not (Test-Path $OutputFile))  { Write-Host "No results found." }
+
 Stop-Transcript | Out-Null
-# remove junk start transcript / end transcript adds - todo consider not using transcript 
-&{
-    (Get-Content $TransLog | Select-Object -SkipLast 4) | Set-Content $TransLog
-    $lines = [System.Collections.Generic.List[string]] (Get-Content $TransLog)
-    $startIndex = $lines.FindIndex({ param($line) $line -match '\[INFO\]' })
-    if ($startIndex -ge 0) { $lines.GetRange($startIndex, $lines.Count - $startIndex) | Set-Content $TransLog }
 
-    # add transcript to output
-    $transContent  = Get-Content -Path $TransLog
-    $outputContent = Get-Content -Path $OutputFile
-    # Combine: trans first, then output
-    $combined = $transContent + @("") + $outputContent
-
-    # Overwrite the output file with combined content
-    $combined | Set-Content -Path $OutputFile
-    if (test-path $TransLog) { Remove-Item $TransLog }
+if (Test-Path $TransLog) {
+    # Remove junk start transcript / end transcript adds and add the log to the output
+    addtranslogtoutput -TransLog $TransLog -OutputFile $OutputFile
+    Remove-Item $TransLog -ErrorAction SilentlyContinue
 }
-
-if (test-path $TempUFAll) { Remove-Item $TempUFAll }
-
 
 # relocate the output results into results directory with any highlited files
 if (Test-Path $OutputFile) {
     relocateoutput -OutputFile $OutputFile -resfldpath $resfldpath -fndirsep $fndirsep
-} else { Write-Host "No results found."}
+}
 
 clearpressedkeys
 read-host "Press ENTER to continue"
