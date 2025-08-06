@@ -100,4 +100,4 @@ powershell -ExecutionPolicy ByPass -File .\scanforchangeshours_fv2.ps1
 ## License
 
 > Licensed under: As specified in git repo - CC0-1.0 license
-> This software is provided 'as-is', without any express or implied warranty. In no event will the author be held liable for any damages arising from the use of this software. This holds true overtop of any statements in the license.
+> This software is provided 'as-is', without any expressed or implied warranty. In no event will the author be held liable for any damages arising from the use of this software. This holds true overtop of any statements in the license.
