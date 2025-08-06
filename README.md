@@ -79,17 +79,9 @@ The script will ask for all the options, or they can be passed as switches on th
 > After Win11 H2 update, PowerShell scripts may not run by default.  
 > You must open a PowerShell terminal to run scripts with bypassed execution policy, or use a batch file or Visual Studio Code.
 
-**From PowerShell terminal:**  
-```powershell
+```
 powershell -ExecutionPolicy ByPass -File .\scanforchangeshours_fv2.ps1
 ```
-**From Batch File (`runfindfile.bat`):**  
-```batch
-powershell -ExecutionPolicy ByPass -File .\scanforchangeshours_fv2.ps1
-```
-**From Visual Studio Code:**  
-Run the script directly within VS Code.
-
 ### Additional Notes
 
 - **Processing Hidden Files:** Script can be up to 3x slower when including hidden files, especially if not running as admin (access denied errors).
