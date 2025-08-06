@@ -26,6 +26,11 @@ The script can search for different file types and provides these functions:
 
    - Output directory: created in your Downloads folder, begins with `sfc-`
    - Optionally: for every copied file, generates a `[filename].meta.json` file with the original location.
+  
+## Example script run
+
+![My diagram](example1.png)
+      --snip--
 
 ## Usage Notes
 
