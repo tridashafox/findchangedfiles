@@ -32,6 +32,23 @@
 # allow params to be passed into script for questions (set as default, or replace questions)
 # fix hang in powershell 7
 
+param (
+    [string]$ModDefault,        # 'Y' means the below changes the default rather than passes the value, default is N
+    [string]$CleanTempFiles,    # 'Y' if want to run windows cleanmgr before running scan, default is N
+    [int]$HoursToCheck,         # Number of hours to look back for changes, default is -3
+    [string]$WhichDrive,        # Which drive to scan, or all drives, default is ALL
+    [string]$CheckFor,          # Which types of files to check for, can be   , default is ALL
+    [string]$CheckHidden,       # 'Y' if want to try to scan hidden files, default is Y
+    [int]$CheckForSizeMin,      # Include files above this min size, default is 0 (all files)
+    [int]$CheckForSizeMax,      # Include files blow this max size, default is -1 (all files)
+    [string]$FilterApp,         # Apply a built in filter to cut down noisey files, default is 'Y' if CheckFor is ALL 
+    [string]$ShowHighlights,    # Look for key file types that changed and list them out, default is 'Y'
+    [string]$CopyHighlights,    # Copy files found by ShowHighlights to a temp directory in downloads
+    [string]$CopyMetaInfo,      # Create a json file with info about for each file found by ShowHighlights 
+    [string]$CopyReportErrors   # Report errors during the ShowHighlights operation into the results file
+)
+
+
 ########################################################################
 # makes sure no keys pending to be processed
 #
@@ -546,16 +563,27 @@ function relocateoutput {
 #
 function getYNinput {
     param (
+        $ModDefault,    # don't typpe as string, we need to know if it is $null, if it's typed it will end up ""
+        $InitValue,     # don't typpe as string
+        [string]$Name,
         [string]$Prompt,
         [string]$Default = 'N'
     )
 
-    $question = $Prompt + " (Y/N): [default " + $Default + "]"
-    $response = (Read-Host $question).ToUpper().Trim()
-    if (-not $response) { return $Default }
+    if (!$InitValue -or $ModDefault) {
+        if ($ModDefault -and $InitValue) { $Default = $InitValue } else { $Default = $Default.ToUpper().Trim() }
+        if ($Default -ne "Y" -and $Default -ne "N") { $Default = "N" }
+        $question = $Prompt + " (Y/N): [default " + $Default + "]"
+        while ($true) {
+            $response = (Read-Host $question).ToUpper().Trim()
+            if (-not $response) { return $Default }
+            if ($response -eq 'Y' -or $response -eq 'N') { return $response } 
+            Write-Host "Invalid option. Enter Y or N" -ForegroundColor Red 
+        }
+    } elseif ($InitValue -eq 'Y' -or $InitValue -eq 'N') { return $InitValue }
 
-    if ($response -eq 'Y' -or $response -eq 'N') { return $response } 
-    return $Default
+    Write-Host "Invalid option for $Name. Must be Y or N" -ForegroundColor Red 
+    exit 1
 }
 
 ########################################################################
@@ -729,82 +757,83 @@ function Invoke-DriveScan {
 # Main 
 #
 
-$hourstocheck = $null
-$FilterApp = $null
-$WhichDrive = $null
+[console]::bufferwidth = 30000
 $dwdir = (New-Object -ComObject Shell.Application).NameSpace('shell:Downloads').Self.Path
 $Drives = Get-CimInstance -ClassName Win32_LogicalDisk -Filter "DriveType=3" | ForEach-Object { "$($_.DeviceID)" }
 $OutputFile = $dwdir + "\result.txt"
 $ExtsToHilight = @(".exe", ".bat", ".pdf", ".jpg", ".png", ".docx", ".mp4", ".tif", ".tiff", ".webp", ".afphoto", ".psd", ".pic", ".jpeg")
-
-[console]::bufferwidth = 30000
-
 clearpressedkeys
 
-# Use cleaner option
-$cleantempfiles = getYNinput "[WCLN] Use Windows (cleanmgr.exe) to clean temp files before looking for changes?" 'N'
+# Options: Use run cleaner option
+$CleanTempFiles = getYNinput $ModDefault $CleanTempFiles "CleanTempFiles" "Use Windows (cleanmgr.exe) to clean temp files before looking for changes?" "N"
 
-while ($true) {
-    $hourstocheck = Read-Host "[HOUR] Enter the hours to add to Now to look for changes: [default -3]" 
-    if (!$hourstocheck) { $hourstocheck = -3 }
-    if ([Int] $hourstocheck -ge 0) { Write-Host "The number of hours to look back must be a negative number." -ForegroundColor Red }
-    else { break }
-}
+# Options: Get hours back to scan, must be negative
+$msgBadHours = "The number of hours to look back must be a negative."
+if (!$HoursToCheck -or $ModDefault) {
+    while ($true) {
+        if ($ModDefault -and $HoursToCheck) { $defval = $HoursToCheck } else { $defval = -3}
+        $HoursToCheck = Read-Host "Enter the hours to add to Now to look for changes: [default $defval]" 
+        if (!$HoursToCheck) { $HoursToCheck = $defval } 
+        if ([Int] $HoursToCheck -ge 0) { Write-Host $msgBadHours -ForegroundColor Red } else { break }
+    }
+} elseif ([Int] $HoursToCheck -ge 0) { Write-Host "Invalid HoursToCheck. $msgBadHours" -ForegroundColor Red; exit 1 }
 
 # Options: What drives to scan 
-$driveStringPrompt = "[DRVE] Which drive? (ALL/" + ((@($Drives) -replace ':') -join '/') + "): [default ALL]"
-$WhichDrive = $(Read-Host $driveStringPrompt).ToUpper()
-if (!$WhichDrive) { $WhichDrive = 'ALL' }
-
 $validDrives = @('ALL') + ($Drives -replace ':')  
-if (-not ($validDrives -contains $WhichDrive)) { $WhichDrive = 'ALL'}
+if (!$WhichDrive -or $ModDefault) {
+    while ($true) {
+        if ($ModDefault -and $WhichDrive) { $defval = $WhichDrive } else { $defval = "ALL" }
+        $driveStringPrompt = "Which drive? (ALL/" + ((@($Drives) -replace ':') -join '/') + "): [default $defval]"
+        $WhichDrive = $(Read-Host $driveStringPrompt).ToUpper()
+        if ($WhichDrive -ieq '') { $WhichDrive = $defval }
+        if (-not ($validDrives -contains $WhichDrive)) { Write-Host "Invalid drive requested. Valid drives are $validDrives." -ForegroundColor Red } else { break }
+    }
+} elseif (-not ($validDrives -contains $WhichDrive)) { Write-Host "Invalid WhichDrive value. Valid drives are $validDrives." -ForegroundColor Red; exit 1 }
 
 # Options: What file types to look for
-$defval = "ALL"
-$CheckFor = $(Read-Host "[TYPE] Check for ALL, any IMaGe type, just PNG, or any EXEcutable type (ALL/IMG/PNG/EXE)?: [default $defval]").ToUpper()
-if ($CheckFor -ieq '') { $CheckFor = $defval}
-if ($CheckFor -notin @('ALL', 'IMG', 'PNG', 'EXE')) { $CheckFor = $defval }
+$validCftypes = @('ALL', 'IMG', 'PNG', 'EXE')
+if (!$CheckFor -or $ModDefault) {
+    while ($true) {
+        if ($ModDefault -and $CheckFor) { $defval = $CheckFor } else { $defval = "ALL" }
+        $CheckFor = $(Read-Host "Check for ALL, any IMaGe type, just PNG, or any EXEcutable type (ALL/IMG/PNG/EXE)?: [default $defval]").ToUpper()
+        if ($CheckFor -ieq '') { $CheckFor = $defval}
+        if ($CheckFor -notin $validCftypes) { Write-Host "Invalid option." -ForegroundColor Red } else { break }
+    }
+} elseif ($CheckFor -notin $validCftypes) { Write-Host "Invalid CheckFor option. Must be one of $validCftypes." -ForegroundColor Red; exit 1 }
 
 # Options: Scan hidden files - can have x3 slowdown
-$CheckHidden = getYNinput "[HIDN] Look for hidden files? (NB: If Y will be slower due to access errors)" 'Y'
+$CheckHidden = getYNinput $ModDefault $CheckHidden "CheckHidden" "Look for hidden files? (NB: If Y will be slower due to access errors)" 'Y'
 
 # Options: Size
-$CheckForSizeMin = Read-Host "[SIZM] Look only for files that are larger than n bytes?: [default 0]"
-if ( $CheckForSizeMin -ieq '' ) { $CheckForSizeMin = '0' }
-$CheckForSizeMax = Read-Host "[SIZX] Look only for files that are smaller than n bytes?: [default -1 (not limited)]"
-if ( $CheckForSizeMax -ieq '' ) { $CheckForSizeMax = '-1'}
+if (!$CheckForSizeMin -or $ModDefault) { 
+    if ($ModDefault -and $CheckForSizeMin) { $defval = $CheckForSizeMin } else { $defval = '0' }
+    $CheckForSizeMin = Read-Host "Look only for files that are larger than n bytes?: [default $defval]" 
+    if ($CheckForSizeMin -ieq '') { $CheckForSizeMin = $defval }
+}
+if (!$CheckForSizeMax -or $ModDefault) { 
+    if ($ModDefault -and $CheckForSizeMax) { $defval = $CheckForSizeMax } else { $defval = '-1' }
+    $CheckForSizeMax = Read-Host "Look only for files that are smaller than n bytes?: [default $defval (not limited)]"
+    if ( $CheckForSizeMax -ieq '' ) { $CheckForSizeMax = '-1'}
+}
 
 # Options: Apply Filter - different default dependng if all drives scan is requested
-if ($CheckFor -ne 'ALL') { 
-    $FilterApp = getYNinput "[FILT] Apply filter? (NB: Default N due to ALL not specified)" 'N'
-}
-else { 
-    $FilterApp = getYNinput "[FILT] Apply filter?" 'Y' 
-}
+if ($CheckFor -ne 'ALL') { $inyndef =  'N' } else { $inyndef =  'Y' }
+$FilterApp = getYNinput $ModDefault $FilterApp "FilterApp" "Apply filter?" $inyndef 
 
 # Options: Highlighted files - different default depending on file type requested
-$ShowHighlights = getYNinput "[HLTQ] Highlight key changed file types at end?" 'Y'
-$CopyHighlights = 'N'
+$ShowHighlights = getYNinput $ModDefault $ShowHighlights "ShowHighlights" "Highlight key changed file types at end?" 'Y'
 if ($ShowHighlights -ieq 'Y') { 
-    $chiprmt = "[HLTC] Copy highlighted files to an output directory?"
-    if ($CheckFor -ieq 'IMG' -or $CheckFor -ieq 'PNG') 
-         { $CopyHighlights = getYNinput $chiprmt 'Y' }
-    else { $CopyHighlights = getYNinput $chiprmt 'N' }
+    if ($CheckFor -ieq 'IMG' -or $CheckFor -ieq 'PNG') { $inyndef =  'Y' } else { $inyndef =  'N' }
+    $CopyHighlights   = getYNinput $ModDefault $CopyHighlights   "CopyHighlights"   "Copy highlighted files to an output directory?" $inyndef 
+    $CopyMetaInfo     = getYNinput $ModDefault $CopyMetaInfo     "CopyMetaInfo"     "Create a [fn].meta.json with path info for each copied highlighted file an output directory?" $inyndef 
+    $CopyReportErrors = getYNinput $ModDefault $CopyReportErrors "CopyReportErrors" "Report errors when copying highlighted files to an output directory?" 'N'
+} else { 
+    $CopyHighlights = 'N'
+    $CopyMetaInfo = 'N' 
+    $CopyReportErrors = 'N'
 }
 
-$CopyMetaInfo = 'N'
-if ($CopyHighlights -ieq 'Y') { 
-    $cmiprmt = "[HLTI] Create a [fn].meta.json with path info for each copied highlighted file an output directory?"
-    if ($CheckFor -ieq 'IMG' -or $CheckFor -ieq 'PNG') 
-         { $CopyMetaInfo = getYNinput $cmiprmt 'N' }
-    else { $CopyMetaInfo = getYNinput $cmiprmt 'Y' }
-}
-
-$CopyReportErrors = 'N'
-if ($CopyHighlights -ieq 'Y') { 
-    $CopyReportErrors = getYNinput "[ERRR] Report errors when copying highlighted files to an output directory?" 'N'
-}
-
+# Start a transaction log so it can be included in the output file for later reference
 $TransLog = New-TemporaryFile
 Start-Transcript -Path $TransLog -Append | Out-Null
 
@@ -819,7 +848,7 @@ if ( $cleantempfiles -ieq 'Y' ) {
 }
 
 # Message to say what the scan will be doing
-$hoursago = (Get-Date).AddHours($hourstocheck)
+$hoursago = (Get-Date).AddHours($HoursToCheck)
 
 $msghid = if ($CheckHidden -eq 'Y') { "including hidden files" } else { "excluding hidden files" }
 $maxmsg = if ($CheckForSizeMax -eq '-1') { "no maximum size" } else { "maximum size $CheckForSizeMax bytes" }
