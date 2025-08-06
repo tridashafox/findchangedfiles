@@ -93,7 +93,7 @@ Run the script directly within VS Code.
 ### Additional Notes
 
 - **Processing Hidden Files:** Script can be up to 3x slower when including hidden files, especially if not running as admin (access denied errors).
-- **Result Folders:** If you run the script multiple times without deleting previous results, the output may be scanned again. This is intentional—to avoid missing new or changed result files.
+- **Result Folders:** If you run the script multiple times without deleting previous results, the output may be scanned again. This is intentional.
 - **PowerShell Version:** Only works reliably with **PowerShell 5.1**, due to threading issues in 7.x.  
   Check your version with:
   ```powershell
@@ -107,5 +107,5 @@ Run the script directly within VS Code.
 
 ## License
 
-> Licensed under: **CC BY-NC-SA 4.0**  
+> Licensed under: As specified in git repo
 > This software is provided 'as-is', without any express or implied warranty. In no event will the author be held liable for any damages arising from the use of this software.
