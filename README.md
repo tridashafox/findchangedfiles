@@ -52,7 +52,7 @@ The script will ask for all the options, or they can be passed as switches on th
 | `-CopyMetaInfo`         | `'Y'` to create a `.meta.json` file with path/info for each copied file. |
 | `-CopyReportErrors`     | `'Y'` to **log copy errors** during the highlight operation into the results file. |
 
-###Example 1 - will run with no prompting:
+### Example 1 - will run with no prompting
 
 `powershell -File '.\findchangedfiles\scanforchangeshours_fv2.ps1' `
   `-CleanTempFiles 'N' `
@@ -68,13 +68,13 @@ The script will ask for all the options, or they can be passed as switches on th
   `-CopyMetaInfo 'N' `
   `-CopyReportErrors 'N'`
 
-###Example 2 -prompting but change one of the defaults:
+### Example 2 -prompting but change one of the defaults
 
 `powershell -File '.\scanforchangeshours_fv2.ps1' `
  `-ModDefault 'Y' `
  `-CheckFor 'IMG' `
 
-###Beware:
+### Beware
 
 > After Win11 H2 update, PowerShell scripts may not run by default.  
 > You must open a PowerShell terminal to run scripts with bypassed execution policy, or use a batch file or Visual Studio Code.
