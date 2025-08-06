@@ -29,6 +29,7 @@
 
 # TODO
 # allow for shorter than hour time period
+# allow params to be passed into script for questions (set as default, or replace questions)
 # fix hang in powershell 7
 
 ########################################################################
@@ -300,6 +301,7 @@ function findfilestohighlight {
         Add-Content -Path $outfile -Value ""
         $filteredtitle = "Highlights - Key file types which changed (exe,bat,pdf,jpg,png,docx,mp4,tiff,webp,afphoto,psd,pic):"
         Add-Content -Path $outfile -Value $filteredtitle -Encoding UTF8
+        Add-Content -Path $outfile -Value ""
         $filesToCopy | Add-Content -Path $outfile -Encoding UTF8
     } else { 
         $filteredtitle = "No files to highlight found."
@@ -322,14 +324,14 @@ function findfilestohighlight {
                     if (Test-Path -LiteralPath $filename) {
                         try {
                             $partname = Get-Item -LiteralPath $filename -Force # -Force needed for files marked as hidden
-                            $fullPath = $partname.FullName
+                            $fullPathStr = $partname.FullName
                             $baseFileName = $partname.BaseName
                             <# 
                             # Old method converts th path into a name c--dir1--dir2--file1.txt
-                            $relativePath = $fullPath.Substring(3)  # Strip drive letter like C:\
+                            $relativePath = $fullPathStr.Substring(3)  # Strip drive letter like C:\
                             $components = $relativePath -split '\\'
                             $safePathName = ($components -join $fnsep)
-                            $baseFileName = $fullPath[0] + $fnsep + $safePathName
+                            $baseFileName = $fullPathStr[0] + $fnsep + $safePathName
                             #>
                         }
                         catch {
@@ -369,10 +371,14 @@ function findfilestohighlight {
                             {
                                 try {
                                     $srcfileInfo = Get-Item $filename
-                                    $meta = @{
-                                        originalPath  = $fullPath
-                                        lastwritetime = $srcfileInfo.LastWriteTime.ToString("yyyy-MM-dd HH:mm:ss")
-                                        copiedOn      = (Get-Date).ToString("o")
+                                    $meta = [ordered]@{  # note the ordered specifier otherwise entries are come out random
+                                        originalPath1     = $fullPathStr
+                                        originalPath2     = $fullPathStr.Replace("\", "/")
+                                        originalname      = Split-Path $srcfileInfo -Leaf
+                                        filesize          = "{0:N2} KB" -f ($srcfileInfo.Length / 1KB)
+                                        lastwritetime     = $srcfileInfo.LastWriteTime.ToString("yyyy-MM-dd HH:mm:ss")
+                                        lastmodifed       = $((New-TimeSpan -Start $srcfileInfo.LastWriteTime).TotalMinutes).ToString("N2") + " mins"
+                                        copiedOn          = (Get-Date).ToString("o")
                                     }
                                     $meta | ConvertTo-Json | Set-Content -Path "$newFileName.meta.json" -Encoding UTF8
                                 } 
@@ -699,17 +705,17 @@ $ExtsToHilight = @(".exe", ".bat", ".pdf", ".jpg", ".png", ".docx", ".mp4", ".ti
 clearpressedkeys
 
 # Use cleaner option
-$cleantempfiles = getYNinput "Use Windows (cleanmgr.exe) to clean temp before looking for changes?" 'N'
+$cleantempfiles = getYNinput "[WCLN] Use Windows (cleanmgr.exe) to clean temp files before looking for changes?" 'N'
 
 while ($true) {
-    $hourstocheck = Read-Host "Enter the hours to add to Now to look for changes: [default -3]" 
+    $hourstocheck = Read-Host "[HOUR] Enter the hours to add to Now to look for changes: [default -3]" 
     if (!$hourstocheck) { $hourstocheck = -3 }
     if ([Int] $hourstocheck -ge 0) { Write-Host "The number of hours to look back must be a negative number." -ForegroundColor Red }
     else { break }
 }
 
 # Options: What drives to scan 
-$driveStringPrompt = "Which drive? (ALL/" + ((@($Drives) -replace ':') -join '/') + "): [default ALL]"
+$driveStringPrompt = "[DRVE] Which drive? (ALL/" + ((@($Drives) -replace ':') -join '/') + "): [default ALL]"
 $WhichDrive = $(Read-Host $driveStringPrompt).ToUpper()
 if (!$WhichDrive) { $WhichDrive = 'ALL' }
 
@@ -717,32 +723,33 @@ $validDrives = @('ALL') + ($Drives -replace ':')
 if (-not ($validDrives -contains $WhichDrive)) { $WhichDrive = 'ALL'}
 
 # Options: What file types to look for
-$CheckFor = $(Read-Host "Check for ALL, any IMaGe type, just PNG, or any EXEcutable type (ALL/IMG/PNG/EXE)?: [default IMG]").ToUpper()
-if ($CheckFor -ieq '') { $CheckFor = 'IMG' }
-if ($CheckFor -notin @('ALL', 'IMG', 'PNG', 'EXE')) { $CheckFor = 'IMG' }
+$defval = "ALL"
+$CheckFor = $(Read-Host "[TYPE] Check for ALL, any IMaGe type, just PNG, or any EXEcutable type (ALL/IMG/PNG/EXE)?: [default $defval]").ToUpper()
+if ($CheckFor -ieq '') { $CheckFor = $defval}
+if ($CheckFor -notin @('ALL', 'IMG', 'PNG', 'EXE')) { $CheckFor = $defval }
 
 # Options: Scan hidden files - can have x3 slowdown
-$CheckHidden = getYNinput "Look for hidden files? (NB: If Y will be slower due to access errors)" 'Y'
+$CheckHidden = getYNinput "[HIDN] Look for hidden files? (NB: If Y will be slower due to access errors)" 'Y'
 
 # Options: Size
-$CheckForSizeMin = Read-Host "Look only for files that are larger than n bytes?: [default 0]"
+$CheckForSizeMin = Read-Host "[SIZM] Look only for files that are larger than n bytes?: [default 0]"
 if ( $CheckForSizeMin -ieq '' ) { $CheckForSizeMin = '0' }
-$CheckForSizeMax = Read-Host "Look only for files that are smaller than n bytes?: [default -1 (not limited)]"
+$CheckForSizeMax = Read-Host "[SIZX] Look only for files that are smaller than n bytes?: [default -1 (not limited)]"
 if ( $CheckForSizeMax -ieq '' ) { $CheckForSizeMax = '-1'}
 
 # Options: Apply Filter - different default dependng if all drives scan is requested
 if ($CheckFor -ne 'ALL') { 
-    $FilterApp = getYNinput "Apply filter? (NB: Default N due to ALL not specified)" 'N'
+    $FilterApp = getYNinput "[FILT] Apply filter? (NB: Default N due to ALL not specified)" 'N'
 }
 else { 
-    $FilterApp = getYNinput "Apply filter?" 'Y' 
+    $FilterApp = getYNinput "[FILT] Apply filter?" 'Y' 
 }
 
 # Options: Highlighted files - different default depending on file type requested
-$ShowHighlights = getYNinput "Highlight key changed file types at end?" 'Y'
+$ShowHighlights = getYNinput "[HLTQ] Highlight key changed file types at end?" 'Y'
 $CopyHighlights = 'N'
 if ($ShowHighlights -ieq 'Y') { 
-    $chiprmt = "Copy highlighted files to an output directory?"
+    $chiprmt = "[HLTC] Copy highlighted files to an output directory?"
     if ($CheckFor -ieq 'IMG' -or $CheckFor -ieq 'PNG') 
          { $CopyHighlights = getYNinput $chiprmt 'Y' }
     else { $CopyHighlights = getYNinput $chiprmt 'N' }
@@ -750,7 +757,7 @@ if ($ShowHighlights -ieq 'Y') {
 
 $CopyMetaInfo = 'N'
 if ($CopyHighlights -ieq 'Y') { 
-    $cmiprmt = "Create a [fn].meta.json with path info for each copied highlighted file an output directory?"
+    $cmiprmt = "[HLTI] Create a [fn].meta.json with path info for each copied highlighted file an output directory?"
     if ($CheckFor -ieq 'IMG' -or $CheckFor -ieq 'PNG') 
          { $CopyMetaInfo = getYNinput $cmiprmt 'N' }
     else { $CopyMetaInfo = getYNinput $cmiprmt 'Y' }
@@ -758,13 +765,17 @@ if ($CopyHighlights -ieq 'Y') {
 
 $CopyReportErrors = 'N'
 if ($CopyHighlights -ieq 'Y') { 
-    $CopyReportErrors = getYNinput "Report errors when copying highlighted files to an output directory?" 'N'
+    $CopyReportErrors = getYNinput "[ERRR] Report errors when copying highlighted files to an output directory?" 'N'
 }
+
+$TransLog = New-TemporaryFile
+Start-Transcript -Path $TransLog -Append | Out-Null
 
 # Do Clean
 if ( $cleantempfiles -ieq 'Y' ) { 
-    Write-Host "Cleaning temp files with cleanmgr..." -ForegroundColor Green
+    Write-Host "`n[INFO] Cleaning temp files with cleanmgr..." -ForegroundColor Green
     Start-Process "cleanmgr.exe" -ArgumentList "/sagerun:1" -Wait 
+    Write-Host "Cleaning done."
 }
 
 # Message to say what the scan will be doing
@@ -775,9 +786,6 @@ $maxmsg = if ($CheckForSizeMax -eq '-1') { "no maximum size" } else { "maximum s
 $msgflt = if ($FilterApp -eq 'Y') { "with filter applied." } else { "with no filter applied." }
 $metaCt = if ($CopyMetaInfo -eq 'Y') { "created." } else { "not created." }
 $msgchi = if ($CopyHighlights -eq 'Y') { "and will be copied to an output directory."} else { "only." }
-
-$TransLog = New-TemporaryFile
-Start-Transcript -Path $TransLog -Append | Out-Null
 
 Write-Host "`n[INFO] Scanning using values..." -ForegroundColor Green
 if ($WhichDrive -eq 'ALL') { Write-Host " - Drives: $Drives" } else { Write-Host " - Drives:" $WhichDrive}
