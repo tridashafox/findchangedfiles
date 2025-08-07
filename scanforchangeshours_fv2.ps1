@@ -37,7 +37,7 @@
 param (
     [string]$ModDefault,        # Y means the below changes the default rather than passes the value, default is N
     [string]$CleanTempFiles,    # Y if want to run windows cleanmgr before running scan, default is N
-    [int]$HoursToCheck,         # Number of hours to look back for changes, default is -3
+    [int]$HoursToCheck,         # Number of hours to look back for changes, default is -3, note this can have a decimal point e.g. -0.5 (last half-hour)
     [string]$WhichDrive,        # Which drive to scan, or all drives, default is ALL
     [string]$CheckFor,          # Which types of files to check for, can be  is ALL, IMG (anything at is an Image), EXT (askes for an CheckForExt), EXE (anything that executes), default is ALL
     [string]$CheckForExt,       # A specific extension to scan for (don't include the '.' before the extension), default PNG. Ignored unless CheckFor is EXT
