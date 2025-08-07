@@ -28,6 +28,7 @@
 # using multiple threading add a lot of complications and restrictions
 
 # TODO
+# move extention lists and filter creation to Main
 # allow for shorter than hour time period
 # allow a directory to scan to be specified rather than just a drive
 # add functional tests (lol)
@@ -481,7 +482,7 @@ function findfilestohighlight {
     if ($copytodw -ieq 'Y') {
         if ($resfolder.Length -gt 0) {
             $tempFolderPath = $resfolder
-            Write-Host "Highlighted files will be copied to $tempFolderPath"
+            # Write-Host "Highlighted files will be copied to $tempFolderPath"
 
             $counterstart = 1 # start at 1 - zero is used for the log output
             $counter = $counterstart
@@ -863,15 +864,15 @@ $hoursago = (Get-Date).AddHours($HoursToCheck)
 $msghid = if ($CheckHidden -eq 'Y') { "including hidden files" } else { "excluding hidden files" }
 $maxmsg = if ($CheckForSizeMax -eq '-1') { "no maximum size" } else { "maximum size $CheckForSizeMax bytes" }
 $msgflt = if ($FilterApp -eq 'Y') { "with filter applied." } else { "with no filter applied." }
-$metaCt = if ($CopyMetaInfo -eq 'Y') { "created." } else { "not created." }
+$metaCt = if ($CopyMetaInfo -eq 'Y') { "will be created." } else { "will not be created." }
 $msgchi = if ($CopyHighlights -eq 'Y') { "and will be copied to an output directory."} else { "only." }
 $msgext = if ($CheckFor -eq 'EXT') { "Extension .$CheckForExt" } else { "" }
 
 Write-Host "`n[INFO] Scanning using values..." -ForegroundColor Green
 if ($WhichDrive -eq 'ALL') { Write-Host " - Drives: $Drives" } else { Write-Host " - Drives:" $WhichDrive}
+Write-Host " - Look for files modified after: $hoursago"
 Write-Host " - File types: $CheckFor" $msgext
 Write-Host " - Hidden files: $msghid"
-Write-Host " - Time modified after: $hoursago"
 Write-Host " - File size between: $CheckForSizeMin bytes and $maxmsg"
 Write-Host " - Filter: $msgflt"
 
