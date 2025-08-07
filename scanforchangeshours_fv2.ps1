@@ -38,7 +38,7 @@ param (
     [string]$CleanTempFiles,    # Y if want to run windows cleanmgr before running scan, default is N
     [int]$HoursToCheck,         # Number of hours to look back for changes, default is -3
     [string]$WhichDrive,        # Which drive to scan, or all drives, default is ALL
-    [string]$CheckFor,          # Which types of files to check for, can be  is ALL, IMG, PNG, EXE, default is ALL
+    [string]$CheckFor,          # Which types of files to check for, can be  is ALL, IMG (anything at is an Image), PNG, EXE (anything that executes), default is ALL
     [string]$CheckHidden,       # Y if want to try to scan hidden files, default is N
     [int]$CheckForSizeMin,      # Include files above this min size, default is 0 (all files)
     [int]$CheckForSizeMax,      # Include files blow this max size, default is -1 (all files)
