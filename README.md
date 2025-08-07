@@ -43,7 +43,7 @@ The script will ask for all the options, or they can be passed as switches on th
 | `-HoursToCheck`            | Number of **hours to look back** for changes. Must be negative. Default: `-3`. |
 | `-WhichDrive`              | Specify the **drive letter** to scan, e.g. `C` or `ALL` to scan all drives. Default: `ALL`. |
 | `-CheckFor`                | File types to check for: `ALL`, `IMG`, `PNG`, `EXE`. Default: `ALL`. |
-| `-CheckHidden`             | `Y` to include **hidden files** in the scan (may be slower). Default: `'Y'`. |
+| `-CheckHidden`             | `Y` to include **hidden files** in the scan (may be slower). Default: `'N'`. |
 | `-CheckForSizeMin`         | Minimum file size (in bytes) to include. Default: `0` (no minimum). |
 | `-CheckForSizeMax`         | Maximum file size (in bytes) to include. Default: `-1` (no limit). |
 | `-FilterApp`               | `Y` to apply built-in filters to reduce noise. Default: `'Y'` if `CheckFor` is `ALL`, otherwise `N`. |
