@@ -29,7 +29,6 @@
 
 # TODO
 # move extention lists and filter creation to Main
-# allow for shorter than hour time period
 # allow a directory to scan to be specified rather than just a drive
 # add functional tests (lol)
 # fix hang in powershell 7.x
