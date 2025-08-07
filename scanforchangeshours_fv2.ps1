@@ -38,7 +38,8 @@ param (
     [string]$CleanTempFiles,    # Y if want to run windows cleanmgr before running scan, default is N
     [int]$HoursToCheck,         # Number of hours to look back for changes, default is -3
     [string]$WhichDrive,        # Which drive to scan, or all drives, default is ALL
-    [string]$CheckFor,          # Which types of files to check for, can be  is ALL, IMG (anything at is an Image), PNG, EXE (anything that executes), default is ALL
+    [string]$CheckFor,          # Which types of files to check for, can be  is ALL, IMG (anything at is an Image), EXT (askes for an CheckForExt), EXE (anything that executes), default is ALL
+    [string]$CheckForExt,       # A specific extension to scan for (don't include the '.' before the extension), default PNG. Ignored unless CheckFor is EXT
     [string]$CheckHidden,       # Y if want to try to scan hidden files, default is N
     [int]$CheckForSizeMin,      # Include files above this min size, default is 0 (all files)
     [int]$CheckForSizeMax,      # Include files blow this max size, default is -1 (all files)
@@ -227,6 +228,7 @@ function doScanfor {
         [DateTime]$hago,
         [string]$dofilter,
         [string]$exttochk,
+        [string]$exttochkact,
         [string]$unfall,
         [int]$minSize,   # Minimum file size in bytes
         [int]$maxSize,    # Maximum file size in bytes
@@ -241,7 +243,7 @@ function doScanfor {
 
     # set up the extensions to look for if looking for images or executables.
     if ( $exttochk -ieq 'IMG' ) { $wildc = "*.BMP", "*.GIF", "*.JPG", "*.JPEG", "*.PNG", "*.TIF", "*.TIFF", "*.ICO" , "*.DDS", "*.MP4", "*.MOV", "*.WebM", "*.AVI", "*.WMV", "*.Webp", "*.afphoto", "*.psd", "*.pic" } 
-    if ( $exttochk -ieq 'PNG' ) { $wildc = "*.PNG" }
+    if ( $exttochk -ieq 'EXT' ) { $wildc = "*." + $exttochkact }
     if ( $exttochk -ieq 'EXE' ) { $wildc = "*.BAT", "*.PS1", "*.BIN", "*.CMD", "*.COM", "*.CPL", "*.EXE", "*.GADGET", "*.INF1", "*.INS",`
          "*.INX", "*.ISU", "*.JOB", "*.JSE", "*.LNK", "*.MSC", "*.MSI", "*.MSP", "*.MST", "*.PAF", "*.PIF", "*.PS1", "*.REG", "*.RGS", `
          "*.SCR", "*.SCT", "*.SHB", "*.SHS", "*.U3P", "*.VB", "*.VBE", "*.VBS", "*.VBSCRIPT", "*.WS", "*.WSF", "*.WSH" }
@@ -626,6 +628,7 @@ function Invoke-SingleDriveScan {
         [datetime]$hoursago,
         $FilterApp,
         $CheckFor,
+        $CheckForExt,
         $TempUFAll,
         $CheckForSizeMin,
         $CheckForSizeMax,
@@ -636,7 +639,7 @@ function Invoke-SingleDriveScan {
     $TempFileX = New-TemporaryFile
     $temploc = $WhichDrive + ":\"
 
-    $result = doScanfor -drive $temploc -outfile $TempFileX -hago $hoursago -dofilter $FilterApp -exttochk $CheckFor -unfall $TempUFAll -minSize $CheckForSizeMin -maxSize $CheckForSizeMax -checkforcehidden $CheckHidden -brootonly $false
+    $result = doScanfor -drive $temploc -outfile $TempFileX -hago $hoursago -dofilter $FilterApp -exttochk $CheckFor -exttochkact $CheckForExt -unfall $TempUFAll -minSize $CheckForSizeMin -maxSize $CheckForSizeMax -checkforcehidden $CheckHidden -brootonly $false
     showscanduration -Result $result
 
     $txtfilterpat = $OutputFile.Replace("\", "\\") + "|" +`
@@ -660,6 +663,7 @@ function Invoke-DriveScan {
         [datetime]$hoursago,
         $FilterApp,
         $CheckFor,
+        $CheckForExt,
         $TempUFAll,
         $CheckForSizeMin,
         $CheckForSizeMax,
@@ -686,7 +690,7 @@ function Invoke-DriveScan {
         $TempFilesMapUFAll[$driveLetter] += $tempRootUFAll 
 
         # create drive root level job
-        $jobs += Start-Job -ScriptBlock ${function:doScanfor} -ArgumentList (Join-Path $drive "\*"), $tempRoot, $hoursago, $FilterApp, $CheckFor, $tempRootUFAll, $CheckForSizeMin, $CheckForSizeMax, $CheckHidden, $true
+        $jobs += Start-Job -ScriptBlock ${function:doScanfor} -ArgumentList (Join-Path $drive "\*"), $tempRoot, $hoursago, $FilterApp, $CheckFor, $CheckForExt, $tempRootUFAll, $CheckForSizeMin, $CheckForSizeMax, $CheckHidden, $true
 
         # one thread for each directory at root level with recurse
         $subDirs = @(Get-ChildItem -Path $(Join-Path $drive "\") -Directory -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName)
@@ -697,7 +701,7 @@ function Invoke-DriveScan {
             $TempFilesMapUFAll[$driveLetter] += $tempSubUFAll
 
             # create recurse root level directories job
-            $jobs += Start-Job -ScriptBlock ${function:doScanfor} -ArgumentList ($dir + '\'), $tempSub, $hoursago, $FilterApp, $CheckFor, $tempSubUFAll, $CheckForSizeMin, $CheckForSizeMax, $CheckHidden, $false
+            $jobs += Start-Job -ScriptBlock ${function:doScanfor} -ArgumentList ($dir + '\'), $tempSub, $hoursago, $FilterApp, $CheckFor, $CheckForExt, $tempSubUFAll, $CheckForSizeMin, $CheckForSizeMax, $CheckHidden, $false
         }
     }
 
@@ -789,15 +793,23 @@ if (!$WhichDrive -or $ModDefault) {
 } elseif (-not ($validDrives -contains $WhichDrive)) { Write-Host "Invalid WhichDrive value. Valid drives are $validDrives." -ForegroundColor Red; exit 1 }
 
 # Options: What file types to look for
-$validCftypes = @('ALL', 'IMG', 'PNG', 'EXE')
+$validCftypes = @('ALL', 'IMG', 'EXT', 'EXE')
 if (!$CheckFor -or $ModDefault) {
     while ($true) {
         if ($ModDefault -and $CheckFor) { $defval = $CheckFor } else { $defval = "ALL" }
-        $CheckFor = $(Read-Host "Check for ALL, any IMaGe type, just PNG, or any EXEcutable type (ALL/IMG/PNG/EXE)?: [default $defval]").ToUpper()
+        $CheckFor = $(Read-Host "Check for ALL, any IMaGe type, any EXTension, or any EXEcutable type (ALL/IMG/EXT/EXE)?: [default $defval]").ToUpper()
         if ($CheckFor -ieq '') { $CheckFor = $defval}
         if ($CheckFor -notin $validCftypes) { Write-Host "Invalid option." -ForegroundColor Red } else { break }
     }
 } elseif ($CheckFor -notin $validCftypes) { Write-Host "Invalid CheckFor option. Must be one of $validCftypes." -ForegroundColor Red; exit 1 }
+
+if ($CheckFor -eq 'EXT') {
+    if (!$CheckForExt -or $ModDefault) {
+        if ($ModDefault -and $CheckForExt) { $defval = $CheckForExt } else { $defval = "PNG" }
+        $CheckForExt = $(Read-Host "Which extension do you want to checkfor (don't include a '.')?: [default $defval]").ToUpper()
+        if ($CheckForExt -ieq '') { $CheckForExt = $defval}
+    } 
+}
 
 # Options: Scan hidden files - can have x3 slowdown
 $CheckHidden = getYNinput $ModDefault $CheckHidden "CheckHidden" "Look for hidden files? (NB: If Y will be slower due to access errors)" 'N'
@@ -853,10 +865,11 @@ $maxmsg = if ($CheckForSizeMax -eq '-1') { "no maximum size" } else { "maximum s
 $msgflt = if ($FilterApp -eq 'Y') { "with filter applied." } else { "with no filter applied." }
 $metaCt = if ($CopyMetaInfo -eq 'Y') { "created." } else { "not created." }
 $msgchi = if ($CopyHighlights -eq 'Y') { "and will be copied to an output directory."} else { "only." }
+$msgext = if ($CheckFor -eq 'EXT') { "Extension .$CheckForExt" } else { "" }
 
 Write-Host "`n[INFO] Scanning using values..." -ForegroundColor Green
 if ($WhichDrive -eq 'ALL') { Write-Host " - Drives: $Drives" } else { Write-Host " - Drives:" $WhichDrive}
-Write-Host " - File types: $CheckFor"
+Write-Host " - File types: $CheckFor" $msgext
 Write-Host " - Hidden files: $msghid"
 Write-Host " - Time modified after: $hoursago"
 Write-Host " - File size between: $CheckForSizeMin bytes and $maxmsg"
@@ -878,10 +891,10 @@ $TempUFAll = New-TemporaryFile
 if ( $WhichDrive -ne 'ALL') { $drivestoscan = @($WhichDrive + ":") } else { $drivestoscan = $Drives }
 
 # DBGNOTE: use this instead of Invoke-DriveScan to scan of just one drive (assumes ALL drives not specified). It does not run in seperarte tread, used to debug doScanFor so break points can be used
-#Invoke-SingleDriveScan -WhichDrive $WhichDrive -OutputFile $OutputFile -hoursago $hoursago -FilterApp $FilterApp -CheckFor $CheckFor -TempUFAll $TempUFAll -CheckForSizeMin $CheckForSizeMin -CheckForSizeMax $CheckForSizeMax -CheckHidden $CheckHidden
+#Invoke-SingleDriveScan -WhichDrive $WhichDrive -OutputFile $OutputFile -hoursago $hoursago -FilterApp $FilterApp -CheckFor $CheckFor -CheckForExt $CheckForExt -TempUFAll $TempUFAll -CheckForSizeMin $CheckForSizeMin -CheckForSizeMax $CheckForSizeMax -CheckHidden $CheckHidden
 
 # Do the scan and get the results with multiple threads to improve time taken
-Invoke-DriveScan -Drives $drivestoscan -OutputFile $OutputFile -hoursago $hoursago -FilterApp $FilterApp -CheckFor $CheckFor -TempUFAll $TempUFAll -CheckForSizeMin $CheckForSizeMin -CheckForSizeMax $CheckForSizeMax -CheckHidden $CheckHidden
+Invoke-DriveScan -Drives $drivestoscan -OutputFile $OutputFile -hoursago $hoursago -FilterApp $FilterApp -CheckFor $CheckFor -CheckForExt $CheckForExt -TempUFAll $TempUFAll -CheckForSizeMin $CheckForSizeMin -CheckForSizeMax $CheckForSizeMax -CheckHidden $CheckHidden
 
 # create a location to store the results and any highlited files
 $resfldpath = createoutputdir
