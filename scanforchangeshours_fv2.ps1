@@ -30,7 +30,7 @@
 # TODO
 # allow for shorter than hour time period
 # allow a directory to scan to be specified rather than just a drive
-# allow params to be passed into script for questions (set as default, or replace questions)
+# add functional tests (lol)
 # fix hang in powershell 7.x
 
 param (
