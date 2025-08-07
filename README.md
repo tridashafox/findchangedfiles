@@ -48,9 +48,9 @@ The script will ask for all the options, or they can be passed as switches on th
 | `-CheckForSizeMax`         | Maximum file size (in bytes) to include. Default: `-1` (no limit). |
 | `-FilterApp`               | `Y` to apply built-in filters to reduce noise. Default: `'Y'` if `CheckFor` is `ALL`, otherwise `N`. |
 | `-ShowHighlights`          | `Y` to **highlight key changed file types** at the end of the scan. Default: `Y`. |
-| `-CopyHighlights`          | `Y` to **copy highlighted files** to a temporary folder in the Downloads directory. |
-| `-CopyMetaInfo`            | `Y` to create a `.meta.json` file with path/info for each copied file. |
-| `-CopyReportErrors`        | `Y` to **log copy errors** during the highlight operation into the results file. |
+| `-CopyHighlights`          | `Y` to **copy highlighted files** to a temporary folder in the Downloads directory. Default is `N` if CheckFor is ALL|
+| `-CopyMetaInfo`            | `Y` to create a `.meta.json` file with path/info for each copied file. Default is `N` if CheckFor is ALL|
+| `-CopyReportErrors`        | `Y` to **log copy errors** during the highlight operation into the results file. Default is `N`|
 
 ### Example 1 - will run with no prompting
 
@@ -68,7 +68,7 @@ The script will ask for all the options, or they can be passed as switches on th
   `-CopyMetaInfo N `
   `-CopyReportErrors N`
 
-### Example 2 -prompting but change one of the defaults
+### Example 2 - run with prompting but change one of the defaults
 
 `powershell -File '.\scanforchangeshours_fv2.ps1' `
  `-ModDefault Y `
