@@ -29,25 +29,25 @@
 
 # TODO
 # allow for shorter than hour time period
+# allow a directory to scan to be specified rather than just a drive
 # allow params to be passed into script for questions (set as default, or replace questions)
-# fix hang in powershell 7
+# fix hang in powershell 7.x
 
 param (
-    [string]$ModDefault,        # 'Y' means the below changes the default rather than passes the value, default is N
-    [string]$CleanTempFiles,    # 'Y' if want to run windows cleanmgr before running scan, default is N
+    [string]$ModDefault,        # Y means the below changes the default rather than passes the value, default is N
+    [string]$CleanTempFiles,    # Y if want to run windows cleanmgr before running scan, default is N
     [int]$HoursToCheck,         # Number of hours to look back for changes, default is -3
     [string]$WhichDrive,        # Which drive to scan, or all drives, default is ALL
-    [string]$CheckFor,          # Which types of files to check for, can be   , default is ALL
-    [string]$CheckHidden,       # 'Y' if want to try to scan hidden files, default is N
+    [string]$CheckFor,          # Which types of files to check for, can be  is ALL, IMG, PNG, EXE, default is ALL
+    [string]$CheckHidden,       # Y if want to try to scan hidden files, default is N
     [int]$CheckForSizeMin,      # Include files above this min size, default is 0 (all files)
     [int]$CheckForSizeMax,      # Include files blow this max size, default is -1 (all files)
     [string]$FilterApp,         # Apply a built in filter to cut down noisey files, default is 'Y' if CheckFor is ALL 
     [string]$ShowHighlights,    # Look for key file types that changed and list them out, default is 'Y'
-    [string]$CopyHighlights,    # Copy files found by ShowHighlights to a temp directory in downloads
-    [string]$CopyMetaInfo,      # Create a json file with info about for each file found by ShowHighlights 
-    [string]$CopyReportErrors   # Report errors during the ShowHighlights operation into the results file
+    [string]$CopyHighlights,    # Copy files found by ShowHighlights to a temp directory in downloads, default is 'N' if CheckFor is ALL
+    [string]$CopyMetaInfo,      # Create a json file with info about for each file found by ShowHighlights, default is 'N' if CheckFor is ALL
+    [string]$CopyReportErrors   # Report errors during the ShowHighlights operation into the results file, default is 'N'
 )
-
 
 ########################################################################
 # makes sure no keys pending to be processed
@@ -77,6 +77,142 @@ function Show-EnvironmentCheck {
     Write-Host "TMP:                      $env:TMP"
     Write-Host "Temp Path (System API):   $([System.IO.Path]::GetTempPath())"
     Write-Host "===============================`n"
+}
+
+########################################################################
+# print out timings (used for debugging)
+#
+function showscanduration {
+    param (
+        [pscustomobject]$Result
+    )
+
+    if ($Result -is [pscustomobject]) {
+        $duration = $Result.EndT - $Result.StartT
+        #$middur = $Result.MidT - $Result.StartT
+        #Write-Host $middur, $duration, $Result.Path
+        Write-Host "Time taken:", $duration, $Result.Path
+    }
+}
+
+########################################################################
+# create a place to put the result output file and any highlighted files
+#
+function createoutputdir {
+    $destinationFolder = (New-Object -ComObject Shell.Application).NameSpace('shell:Downloads').Self.Path
+    if (Test-Path -Path $destinationFolder -PathType Container) {
+        $tempFolderName = "sfc-" + (Get-Date -Format "yyyyMMdd-HHmmss-fff")  # do not change "sfc-"
+        $tempFolderPath = Join-Path $destinationFolder $tempFolderName
+        $resfldpath = $tempFolderPath
+        New-Item -ItemType Directory -Path $resfldpath | Out-Null
+        return $resfldpath
+    }
+}
+
+########################################################################
+# remove junk transript log adds at start and end and add to output file
+#
+function addtranslogtoutput {
+    param (
+        [Parameter(Mandatory = $true)] [string]$TransLog,
+        [Parameter(Mandatory = $true)] [string]$OutputFile
+    )
+
+    # Trim last 4 lines of transcript
+    (Get-Content $TransLog | Select-Object -SkipLast 4) | Set-Content $TransLog
+
+    # Filter from first [INFO] line onward
+    $lines = [System.Collections.Generic.List[string]](Get-Content $TransLog)
+    $startIndex = $lines.FindIndex({ param($line) $line -match '\[INFO\]' })
+    if ($startIndex -ge 0) {
+        $lines.GetRange($startIndex, $lines.Count - $startIndex) | Set-Content $TransLog
+    }
+
+    # Merge transcript + output
+    $transContent  = Get-Content -Path $TransLog
+    $outputContent = Get-Content -Path $OutputFile
+    $combined      = $transContent + @("") + $outputContent
+    $combined | Set-Content -Path $OutputFile
+}
+
+########################################################################
+# moves the output result file to the output directory
+#
+function relocateoutput {
+    param (
+        [string]$OutputFile,
+        [string]$resfldpath,
+        [string]$fndirsep = "--"
+    )
+
+    # clean up any extra blank lines jfthoi
+    (Get-Content $OutputFile | ForEach-Object { $_.Trim() }) -join "`r`n" -replace "(`r?`n){2,}", "`r`n`r`n" | Set-Content $OutputFile
+
+    $originalName = Split-Path -Path $OutputFile -Leaf
+    $newFileName = "{0:D8}{1}{2}" -f 0, $fndirsep, $originalName
+    $newPath = Join-Path -Path $resfldpath -ChildPath $newFileName
+    Move-Item -LiteralPath $OutputFile -Destination $newPath -Force
+    Write-Host "Result placed in $newPath."
+}
+
+########################################################################
+# handle Y/N questions
+#
+function getYNinput {
+    param (
+        $ModDefault,    # don't typpe as string, we need to know if it is $null, if it's typed it will end up ""
+        $InitValue,     # don't typpe as string
+        [string]$Name,
+        [string]$Prompt,
+        [string]$Default = 'N'
+    )
+
+    if (!$InitValue -or $ModDefault) {
+        if ($ModDefault -and $InitValue) { $Default = $InitValue } else { $Default = $Default.ToUpper().Trim() }
+        if ($Default -ne "Y" -and $Default -ne "N") { $Default = "N" }
+        $question = $Prompt + " (Y/N): [default " + $Default + "]"
+        while ($true) {
+            $response = (Read-Host $question).ToUpper().Trim()
+            if (-not $response) { return $Default }
+            if ($response -eq 'Y' -or $response -eq 'N') { return $response } 
+            Write-Host "Invalid option. Enter Y or N" -ForegroundColor Red 
+        }
+    } elseif ($InitValue -eq 'Y' -or $InitValue -eq 'N') { return $InitValue }
+
+    Write-Host "Invalid option for $Name. Must be Y or N" -ForegroundColor Red 
+    exit 1
+}
+
+########################################################################
+# wait for jobs to complete with progress dots
+#
+function watchjobprogress {
+    param (
+        [Parameter(Mandatory = $true)]
+        [System.Collections.ArrayList]$jobs
+    )
+
+    $jobcnt = $jobs.Where({ $_.State -eq 'Running' }).Count
+    $oldjobcnt = 0
+
+    # Write does not output to transcript log
+    # Transcript logs can't handle Write-Host "." -NoNewline
+    # We don't want this in the log anway so use the .net framework Write
+    [Console]::Write("Processing scan in $jobcnt parallel jobs:")  
+
+    while ($jobcnt -gt 0) {
+        if ($oldjobcnt -ne $jobcnt) {
+            [Console]::WriteLine("") 
+            [Console]::Write("Jobs remaining $jobcnt.")
+            $oldjobcnt = $jobcnt
+        }
+        [Console]::Write(".")
+        $delay = 800 + (Get-Random -Minimum -200 -Maximum 201)
+        Start-Sleep -Milliseconds $delay
+        $jobcnt = $jobs.Where({ $_.State -eq 'Running' }).Count
+    }
+
+    [Console]::WriteLine("done.")
 }
 
 ########################################################################
@@ -448,7 +584,6 @@ function findfilestohighlight {
     }
 }
 
-
 ########################################################################
 # Shows counts and summary of output file on console and add the
 # results to the accumlative output file 
@@ -479,143 +614,6 @@ function postprocess {
         $msg = $drivelet + ":\ number of modified or created files"
         Write-Host $msg $lnsnum
     }
-}
-
-########################################################################
-# print out timings (used for debugging)
-#
-function showscanduration {
-    param (
-        [pscustomobject]$Result
-    )
-
-    if ($Result -is [pscustomobject]) {
-        $duration = $Result.EndT - $Result.StartT
-        #$middur = $Result.MidT - $Result.StartT
-        #Write-Host $middur, $duration, $Result.Path
-        Write-Host "Time taken:", $duration, $Result.Path
-    }
-}
-
-########################################################################
-# create a place to put the result output file and any highlighted files
-#
-function createoutputdir {
-    $destinationFolder = (New-Object -ComObject Shell.Application).NameSpace('shell:Downloads').Self.Path
-    if (Test-Path -Path $destinationFolder -PathType Container) {
-        $tempFolderName = "sfc-" + (Get-Date -Format "yyyyMMdd-HHmmss-fff")  # do not change "sfc-"
-        $tempFolderPath = Join-Path $destinationFolder $tempFolderName
-        $resfldpath = $tempFolderPath
-        New-Item -ItemType Directory -Path $resfldpath | Out-Null
-        return $resfldpath
-    }
-}
-
-########################################################################
-# remove junk transript log adds at start and end and add to output file
-#
-function addtranslogtoutput {
-    param (
-        [Parameter(Mandatory = $true)] [string]$TransLog,
-        [Parameter(Mandatory = $true)] [string]$OutputFile
-    )
-
-    # Trim last 4 lines of transcript
-    (Get-Content $TransLog | Select-Object -SkipLast 4) | Set-Content $TransLog
-
-    # Filter from first [INFO] line onward
-    $lines = [System.Collections.Generic.List[string]](Get-Content $TransLog)
-    $startIndex = $lines.FindIndex({ param($line) $line -match '\[INFO\]' })
-    if ($startIndex -ge 0) {
-        $lines.GetRange($startIndex, $lines.Count - $startIndex) | Set-Content $TransLog
-    }
-
-    # Merge transcript + output
-    $transContent  = Get-Content -Path $TransLog
-    $outputContent = Get-Content -Path $OutputFile
-    $combined      = $transContent + @("") + $outputContent
-    $combined | Set-Content -Path $OutputFile
-}
-
-
-########################################################################
-# moves the output result file to the output directory
-#
-function relocateoutput {
-    param (
-        [string]$OutputFile,
-        [string]$resfldpath,
-        [string]$fndirsep = "--"
-    )
-
-    # clean up any extra blank lines jfthoi
-    (Get-Content $OutputFile | ForEach-Object { $_.Trim() }) -join "`r`n" -replace "(`r?`n){2,}", "`r`n`r`n" | Set-Content $OutputFile
-
-    $originalName = Split-Path -Path $OutputFile -Leaf
-    $newFileName = "{0:D8}{1}{2}" -f 0, $fndirsep, $originalName
-    $newPath = Join-Path -Path $resfldpath -ChildPath $newFileName
-    Move-Item -LiteralPath $OutputFile -Destination $newPath -Force
-    Write-Host "Result placed in $newPath."
-}
-
-########################################################################
-# handle Y/N questions
-#
-function getYNinput {
-    param (
-        $ModDefault,    # don't typpe as string, we need to know if it is $null, if it's typed it will end up ""
-        $InitValue,     # don't typpe as string
-        [string]$Name,
-        [string]$Prompt,
-        [string]$Default = 'N'
-    )
-
-    if (!$InitValue -or $ModDefault) {
-        if ($ModDefault -and $InitValue) { $Default = $InitValue } else { $Default = $Default.ToUpper().Trim() }
-        if ($Default -ne "Y" -and $Default -ne "N") { $Default = "N" }
-        $question = $Prompt + " (Y/N): [default " + $Default + "]"
-        while ($true) {
-            $response = (Read-Host $question).ToUpper().Trim()
-            if (-not $response) { return $Default }
-            if ($response -eq 'Y' -or $response -eq 'N') { return $response } 
-            Write-Host "Invalid option. Enter Y or N" -ForegroundColor Red 
-        }
-    } elseif ($InitValue -eq 'Y' -or $InitValue -eq 'N') { return $InitValue }
-
-    Write-Host "Invalid option for $Name. Must be Y or N" -ForegroundColor Red 
-    exit 1
-}
-
-########################################################################
-# wait for jobs to complete with progress dots
-#
-function watchjobprogress {
-    param (
-        [Parameter(Mandatory = $true)]
-        [System.Collections.ArrayList]$jobs
-    )
-
-    $jobcnt = $jobs.Where({ $_.State -eq 'Running' }).Count
-    $oldjobcnt = 0
-
-    # Write does not output to transcript log
-    # Transcript logs can't handle Write-Host "." -NoNewline
-    # We don't want this in the log anway so use the .net framework Write
-    [Console]::Write("Processing scan in $jobcnt parallel jobs:")  
-
-    while ($jobcnt -gt 0) {
-        if ($oldjobcnt -ne $jobcnt) {
-            [Console]::WriteLine("") 
-            [Console]::Write("Jobs remaining $jobcnt.")
-            $oldjobcnt = $jobcnt
-        }
-        [Console]::Write(".")
-        $delay = 800 + (Get-Random -Minimum -200 -Maximum 201)
-        Start-Sleep -Milliseconds $delay
-        $jobcnt = $jobs.Where({ $_.State -eq 'Running' }).Count
-    }
-
-    [Console]::WriteLine("done.")
 }
 
 ########################################################################
@@ -823,7 +821,7 @@ $FilterApp = getYNinput $ModDefault $FilterApp "FilterApp" "Apply filter?" $inyn
 # Options: Highlighted files - different default depending on file type requested
 $ShowHighlights = getYNinput $ModDefault $ShowHighlights "ShowHighlights" "Highlight key changed file types at end?" 'Y'
 if ($ShowHighlights -ieq 'Y') { 
-    if ($CheckFor -ieq 'IMG' -or $CheckFor -ieq 'PNG') { $inyndef =  'Y' } else { $inyndef =  'N' }
+    if ($CheckFor -ieq 'ALL') { $inyndef =  'N' } else { $inyndef =  'Y' }
     $CopyHighlights   = getYNinput $ModDefault $CopyHighlights   "CopyHighlights"   "Copy highlighted files to an output directory?" $inyndef 
     $CopyMetaInfo     = getYNinput $ModDefault $CopyMetaInfo     "CopyMetaInfo"     "Create a [fn].meta.json with path info for each copied highlighted file an output directory?" $inyndef 
     $CopyReportErrors = getYNinput $ModDefault $CopyReportErrors "CopyReportErrors" "Report errors when copying highlighted files to an output directory?" 'N'
