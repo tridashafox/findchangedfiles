@@ -42,7 +42,7 @@ The script will ask for all the options, or they can be passed as switches on th
 | `-CleanTempFiles`          | `Y` to run **Windows Disk Cleanup (cleanmgr.exe)** before scanning. Default: `N`. |
 | `-HoursToCheck`            | Number of **hours to look back** for changes. Must be negative. Default: `-3`. |
 | `-WhichDrive`              | Specify the **drive letter** to scan, e.g. `C` or `ALL` to scan all drives. Default: `ALL`. |
-| `-CheckFor`                | File types to check for: `ALL`, `IMG`, `PNG`, `EXE`. Default: `ALL`. |
+| `-CheckFor`                | `File groups` to check for: `ALL`, `IMG`, `PNG`, `EXE`. Default: `ALL`. |
 | `-CheckHidden`             | `Y` to include **hidden files** in the scan (may be slower). Default: `'N'`. |
 | `-CheckForSizeMin`         | Minimum file size (in bytes) to include. Default: `0` (no minimum). |
 | `-CheckForSizeMax`         | Maximum file size (in bytes) to include. Default: `-1` (no limit). |
@@ -51,6 +51,11 @@ The script will ask for all the options, or they can be passed as switches on th
 | `-CopyHighlights`          | `Y` to **copy highlighted files** to a temporary folder in the Downloads directory. Default is `N` if CheckFor is ALL|
 | `-CopyMetaInfo`            | `Y` to create a `.meta.json` file with path/info for each copied file. Default is `N` if CheckFor is ALL|
 | `-CopyReportErrors`        | `Y` to **log copy errors** during the highlight operation into the results file. Default is `N`|
+
+`File groups` are sets of extensions not actual extensions
+`IMG` - "*.BMP", "*.GIF", "*.JPG", "*.JPEG", "*.PNG", "*.TIF", "*.TIFF", "*.ICO" , "*.DDS", "*.MP4", "*.MOV", "*.WebM", "*.AVI", "*.WMV", "*.Webp", "*.afphoto", "*.psd", "*.pic" 
+`EXE` - "*.BAT", "*.PS1", "*.BIN", "*.CMD", "*.COM", "*.CPL", "*.EXE", "*.GADGET", "*.INF1", "*.INS", "*.INX", "*.ISU", "*.JOB", "*.JSE", "*.LNK", "*.MSC", "*.MSI", "*.MSP", "*.MST", "*.PAF", "*.PIF", "*.PS1", "*.REG", "*.RGS", "*.SCR", "*.SCT", "*.SHB", "*.SHS", "*.U3P", "*.VB", "*.VBE", "*.VBS", "*.VBSCRIPT", "*.WS", "*.WSF", "*.WSH"
+`PNG` - "*.PNG" - a single extension can be changed in the script to something else as requires.
 
 ### Example 1 - will run with no prompting
 
