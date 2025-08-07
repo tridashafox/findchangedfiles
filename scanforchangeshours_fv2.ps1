@@ -38,7 +38,7 @@ param (
     [int]$HoursToCheck,         # Number of hours to look back for changes, default is -3
     [string]$WhichDrive,        # Which drive to scan, or all drives, default is ALL
     [string]$CheckFor,          # Which types of files to check for, can be   , default is ALL
-    [string]$CheckHidden,       # 'Y' if want to try to scan hidden files, default is Y
+    [string]$CheckHidden,       # 'Y' if want to try to scan hidden files, default is N
     [int]$CheckForSizeMin,      # Include files above this min size, default is 0 (all files)
     [int]$CheckForSizeMax,      # Include files blow this max size, default is -1 (all files)
     [string]$FilterApp,         # Apply a built in filter to cut down noisey files, default is 'Y' if CheckFor is ALL 
@@ -802,7 +802,7 @@ if (!$CheckFor -or $ModDefault) {
 } elseif ($CheckFor -notin $validCftypes) { Write-Host "Invalid CheckFor option. Must be one of $validCftypes." -ForegroundColor Red; exit 1 }
 
 # Options: Scan hidden files - can have x3 slowdown
-$CheckHidden = getYNinput $ModDefault $CheckHidden "CheckHidden" "Look for hidden files? (NB: If Y will be slower due to access errors)" 'Y'
+$CheckHidden = getYNinput $ModDefault $CheckHidden "CheckHidden" "Look for hidden files? (NB: If Y will be slower due to access errors)" 'N'
 
 # Options: Size
 if (!$CheckForSizeMin -or $ModDefault) { 
