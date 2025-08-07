@@ -40,7 +40,7 @@ The script will ask for all the options, or they can be passed as switches on th
 |----------------------------|-------------|
 | `-ModDefault`              | `Y` means the parameter **modifies the default value**, rather than setting it. Default: `N`. |
 | `-CleanTempFiles`          | `Y` to run **Windows Disk Cleanup (cleanmgr.exe)** before scanning. Default: `N`. |
-| `-HoursToCheck`            | Number of **hours to look back** for changes. Must be negative. Can be a fraction, e.g. -0.5 for half an hour. Default: `-3`. |
+| `-HoursToCheck`            | Number of **hours to look back** for changes. Must be negative. Can be a fraction, e.g. -0.5 for 30mins. Default: `-3`. |
 | `-WhichDrive`              | Specify the **drive letter** to scan, e.g. `C` or `ALL` to scan all drives. Default: `ALL`. |
 | `-CheckFor`                | `File groups` to check for: `ALL`, `IMG`, `EXT`, `EXE`. Default: `ALL`. |
 | `-CheckForExt`             | A specific extension (no '.') to check for. Prompted for if `CheckFor` is `EXT`. Default `png` |
