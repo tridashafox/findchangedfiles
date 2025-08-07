@@ -68,7 +68,7 @@ The script will ask for all the options, or they can be passed as switches on th
   `-CopyMetaInfo N `
   `-CopyReportErrors N`
 
-### Example 2 -prompting but change one of the defaults
+### Example 2 - run with prompting but change one of the defaults
 
 `powershell -File '.\scanforchangeshours_fv2.ps1' `
  `-ModDefault Y `
