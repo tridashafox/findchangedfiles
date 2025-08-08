@@ -36,7 +36,7 @@
 param (
     [string]$ModDefault,        # Y means the below changes the default rather than passes the value, default is N
     [string]$CleanTempFiles,    # Y if want to run windows cleanmgr before running scan, default is N
-    [int]$HoursToCheck,         # Number of hours to look back for changes, default is -3, note this can have a decimal point e.g. -0.5 (last half-hour)
+    [double]$HoursToCheck,      # Number of hours to look back for changes, default is -3, note this can have a decimal point e.g. -0.5 (last half-hour)
     [string]$WhichDrive,        # Which drive to scan, or all drives, default is ALL
     [string]$CheckFor,          # Which types of files to check for, can be  is ALL, IMG (anything at is an Image), EXT (askes for an CheckForExt), EXE (anything that executes), default is ALL
     [string]$CheckForExt,       # A specific extension to scan for (don't include the '.' before the extension), default PNG. Ignored unless CheckFor is EXT
@@ -770,21 +770,34 @@ clearpressedkeys
 $CleanTempFiles = getYNinput $ModDefault $CleanTempFiles "CleanTempFiles" "Use Windows (cleanmgr.exe) to clean temp files before looking for changes?" "N"
 
 # Options: Get hours back to scan, must be negative
-$msgBadHours = "The number of hours to look back must be a negative."
-if (!$HoursToCheck -or $ModDefault) {
-    while ($true) {
-        if ($ModDefault -and $HoursToCheck) { $defval = $HoursToCheck } else { $defval = -3}
-        $HoursToCheck = Read-Host "Enter the hours to add to Now to look for changes: [default $defval]" 
-        if (!$HoursToCheck) { $HoursToCheck = $defval } 
-        if ([Int] $HoursToCheck -ge 0) { Write-Host $msgBadHours -ForegroundColor Red } else { break }
+<# Note below $HoursToCheck -eq $null rather than !$HoursToCheck, for strings this works as even an empty string is not false. But for numbers zero is false, so need to check for $null
+   This is a core issue of untyped language: 
+
+    function launchrocket {
+        param ( $cmdinstr )
+        if ($cmdinstr) { "count down and launch rocket" }
     }
-} elseif ([Int] $HoursToCheck -ge 0) { Write-Host "Invalid HoursToCheck. $msgBadHours" -ForegroundColor Red; exit 1 }
+    
+    launchrocket -cmdinstr $a 
+    launchrocket -cmdinstr [int]a$ 
+    
+    For the same value and logic a change of type changes the behavior. 
+#>
+$msgBadHours = "The number of hours to look back must be a negative."
+if ($HoursToCheck -eq $null -or $ModDefault) {
+    if ($ModDefault -and $HoursToCheck) { $defval = $HoursToCheck } else { $defval = -3}
+    while ($true) {
+        $HoursToCheck = [double](Read-Host "Enter the hours to add to Now to look for changes: [default $defval]" )
+        if (!$HoursToCheck) { $HoursToCheck = $defval } 
+        if ($HoursToCheck -ge 0) { Write-Host $msgBadHours -ForegroundColor Red } else { break }
+    }
+} elseif ($HoursToCheck -ge 0) { Write-Host "Invalid HoursToCheck. $msgBadHours" -ForegroundColor Red; exit 1 }
 
 # Options: What drives to scan 
 $validDrives = @('ALL') + ($Drives -replace ':')  
 if (!$WhichDrive -or $ModDefault) {
+    if ($ModDefault -and $WhichDrive) { $defval = $WhichDrive } else { $defval = "ALL" }
     while ($true) {
-        if ($ModDefault -and $WhichDrive) { $defval = $WhichDrive } else { $defval = "ALL" }
         $driveStringPrompt = "Which drive? (ALL/" + ((@($Drives) -replace ':') -join '/') + "): [default $defval]"
         $WhichDrive = $(Read-Host $driveStringPrompt).ToUpper()
         if ($WhichDrive -ieq '') { $WhichDrive = $defval }
@@ -795,8 +808,8 @@ if (!$WhichDrive -or $ModDefault) {
 # Options: What file types to look for
 $validCftypes = @('ALL', 'IMG', 'EXT', 'EXE')
 if (!$CheckFor -or $ModDefault) {
+    if ($ModDefault -and $CheckFor) { $defval = $CheckFor } else { $defval = "ALL" }
     while ($true) {
-        if ($ModDefault -and $CheckFor) { $defval = $CheckFor } else { $defval = "ALL" }
         $CheckFor = $(Read-Host "Check for ALL, any IMaGe type, any EXTension, or any EXEcutable type (ALL/IMG/EXT/EXE)?: [default $defval]").ToUpper()
         if ($CheckFor -ieq '') { $CheckFor = $defval}
         if ($CheckFor -notin $validCftypes) { Write-Host "Invalid option." -ForegroundColor Red } else { break }
@@ -814,13 +827,16 @@ if ($CheckFor -eq 'EXT') {
 # Options: Scan hidden files - can have x3 slowdown
 $CheckHidden = getYNinput $ModDefault $CheckHidden "CheckHidden" "Look for hidden files? (NB: If Y will be slower due to access errors)" 'N'
 
+Write-Host "DEBUG: CheckForSizeMin='$CheckForSizeMin' ModDefault='$ModDefault'" (!$CheckForSizeMin -or $ModDefault)
+Write-Host "DEBUG: CheckForSizeMax='$CheckForSizeMax' ModDefault='$ModDefault'" (!$CheckForSizeMax -or $ModDefault)
+
 # Options: Size
-if (!$CheckForSizeMin -or $ModDefault) { 
+if ($CheckForSizeMin -eq $null -or $ModDefault) { 
     if ($ModDefault -and $CheckForSizeMin) { $defval = $CheckForSizeMin } else { $defval = '0' }
     $CheckForSizeMin = Read-Host "Look only for files that are larger than n bytes?: [default $defval]" 
     if ($CheckForSizeMin -ieq '') { $CheckForSizeMin = $defval }
 }
-if (!$CheckForSizeMax -or $ModDefault) { 
+if ($CheckForSizeMax -eq $null -or $ModDefault) { 
     if ($ModDefault -and $CheckForSizeMax) { $defval = $CheckForSizeMax } else { $defval = '-1' }
     $CheckForSizeMax = Read-Host "Look only for files that are smaller than n bytes?: [default $defval (not limited)]"
     if ( $CheckForSizeMax -ieq '' ) { $CheckForSizeMax = '-1'}
@@ -858,6 +874,7 @@ if ( $cleantempfiles -ieq 'Y' ) {
 }
 
 # Message to say what the scan will be doing
+
 $hoursago = (Get-Date).AddHours($HoursToCheck)
 
 $msghid = if ($CheckHidden -eq 'Y') { "including hidden files" } else { "excluding hidden files" }
