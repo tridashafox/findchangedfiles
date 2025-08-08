@@ -62,7 +62,7 @@ The script will ask for all the options, or they can be passed as switches on th
 
 ### Example 1 - will run with no prompting
 
-`powershell -File '.\findchangedfiles\scanforchangeshours_fv2.ps1' `
+`powershell -File '.\scanforchangeshours_fv2.ps1' `
   `-CleanTempFiles N `
   `-HoursToCheck -3 `
   `-WhichDrive ALL `
