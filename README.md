@@ -1,5 +1,3 @@
-Certainly! Here’s your document formatted in **Markdown** using code and info sections as appropriate for a PowerShell project readme or documentation file (e.g. `README.md`):
-
 # scanforchangeshours_fv2
 
 **PowerShell scripts to search for files changed on all, or a single, local drive within the last X hours using multiple threads.**
