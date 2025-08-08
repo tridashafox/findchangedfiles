@@ -13,6 +13,7 @@ Scenarios include:
 - You did an install and can't find the package location.
 - You are seeing a fault on your system but have not changed anything.
 - Checking if a virus or unknown application installed a file.
+- Understanding which files are being writting to verbosely (Adoble I'm looking at you)
 
 The script can search for different file types and provides these functions:
 
