@@ -1,5 +1,3 @@
-Certainly! Here’s your document formatted in **Markdown** using code and info sections as appropriate for a PowerShell project readme or documentation file (e.g. `README.md`):
-
 # scanforchangeshours_fv2
 
 **PowerShell scripts to search for files changed on all, or a single, local drive within the last X hours using multiple threads.**
@@ -13,6 +11,7 @@ Scenarios include:
 - You did an install and can't find the package location.
 - You are seeing a fault on your system but have not changed anything.
 - Checking if a virus or unknown application installed a file.
+- Understanding which files are being writting to verbosely (Adoble I'm looking at you)
 
 The script can search for different file types and provides these functions:
 
@@ -40,7 +39,7 @@ The script will ask for all the options, or they can be passed as switches on th
 |----------------------------|-------------|
 | `-ModDefault`              | `Y` means the parameter **modifies the default value**, rather than setting it. Default: `N`. |
 | `-CleanTempFiles`          | `Y` to run **Windows Disk Cleanup (cleanmgr.exe)** before scanning. Default: `N`. |
-| `-HoursToCheck`            | Number of **hours to look back** for changes. Must be negative. Default: `-3`. |
+| `-HoursToCheck`            | Number of **hours to look back** for changes. Must be negative. Can be a fraction, e.g. -0.5 for 30mins. Default: `-3`. |
 | `-WhichDrive`              | Specify the **drive letter** to scan, e.g. `C` or `ALL` to scan all drives. Default: `ALL`. |
 | `-CheckFor`                | `File groups` to check for: `ALL`, `IMG`, `EXT`, `EXE`. Default: `ALL`. |
 | `-CheckForExt`             | A specific extension (no '.') to check for. Prompted for if `CheckFor` is `EXT`. Default `png` |
@@ -59,11 +58,11 @@ The script will ask for all the options, or they can be passed as switches on th
 | `ALL`     | all extensions |
 | `IMG`     | BMP, GIF, JPG, JPEG, PNG, TIF, TIFF, ICO, DDS, MP4, MOV, WEBM, AVI, WMV, WEBP, AFPHOTO, PSD, PIC |
 | `EXE`     | BAT, PS1, BIN, CMD, COM, CPL, EXE, GADGET, INF1, INS, INX, ISU, JOB, JSE, LNK, MSC, MSI, MSP, MST, PAF, PIF, PS1, REG, RGS, SCR, SCT, SHB, SHS, U3P, VB, VBE, VBS, VBSCRIPT, WS, WSF, WSH |
-| `EXT`     | A single extension to look for as defined in `CheckForExt`. Do not include the `'.'` prefix. |
+| `EXT`     | A single extension to look for as defined in `CheckForExt`. Do not include the `'.'` prefix when specifing  `CheckForExt`. |
 
 ### Example 1 - will run with no prompting
 
-`powershell -File '.\findchangedfiles\scanforchangeshours_fv2.ps1' `
+`powershell -File '.\scanforchangeshours_fv2.ps1' `
   `-CleanTempFiles N `
   `-HoursToCheck -3 `
   `-WhichDrive ALL `
