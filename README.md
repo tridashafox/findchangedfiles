@@ -76,7 +76,7 @@ The script will ask for all the options, or they can be passed as switches on th
 > You must open a PowerShell terminal to run scripts with bypassed execution policy, or use a batch file or Visual Studio Code.
 
 ```
-powershell -ExecutionPolicy ByPass -File .\scanforchangeshours_fv2.ps1
+powershell -ExecutionPolicy ByPass -File scanforchangeshours_fv2.ps1
 ```
 ### Additional Notes
 
