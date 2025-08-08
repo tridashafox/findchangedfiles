@@ -59,7 +59,7 @@ The script will ask for all the options, or they can be passed as switches on th
 | `ALL`     | all extensions |
 | `IMG`     | BMP, GIF, JPG, JPEG, PNG, TIF, TIFF, ICO, DDS, MP4, MOV, WEBM, AVI, WMV, WEBP, AFPHOTO, PSD, PIC |
 | `EXE`     | BAT, PS1, BIN, CMD, COM, CPL, EXE, GADGET, INF1, INS, INX, ISU, JOB, JSE, LNK, MSC, MSI, MSP, MST, PAF, PIF, PS1, REG, RGS, SCR, SCT, SHB, SHS, U3P, VB, VBE, VBS, VBSCRIPT, WS, WSF, WSH |
-| `EXT`     | A single extension to look for as defined in `CheckForExt`. Do not include the `'.'` prefix. |
+| `EXT`     | A single extension to look for as defined in `CheckForExt`. Do not include the `'.'` prefix when specifing  `CheckForExt`. |
 
 ### Example 1 - will run with no prompting
 
