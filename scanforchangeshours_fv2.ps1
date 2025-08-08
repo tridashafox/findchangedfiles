@@ -826,10 +826,6 @@ if ($CheckFor -eq 'EXT') {
 
 # Options: Scan hidden files - can have x3 slowdown
 $CheckHidden = getYNinput $ModDefault $CheckHidden "CheckHidden" "Look for hidden files? (NB: If Y will be slower due to access errors)" 'N'
-
-Write-Host "DEBUG: CheckForSizeMin='$CheckForSizeMin' ModDefault='$ModDefault'" (!$CheckForSizeMin -or $ModDefault)
-Write-Host "DEBUG: CheckForSizeMax='$CheckForSizeMax' ModDefault='$ModDefault'" (!$CheckForSizeMax -or $ModDefault)
-
 # Options: Size
 if ($CheckForSizeMin -eq $null -or $ModDefault) { 
     if ($ModDefault -and $CheckForSizeMin) { $defval = $CheckForSizeMin } else { $defval = '0' }
