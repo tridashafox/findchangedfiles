@@ -28,8 +28,8 @@
 # using multiple threading add a lot of complications and restrictions
 
 # TODO
-# move extention lists and filter creation to Main
-# allow a directory to scan to be specified rather than just a drive
+# move extension lists into function near buildfilters
+# allow a directory to be scanned rather than just a drive
 # add functional tests (lol)
 # fix hang in powershell 7.x
 
@@ -227,6 +227,7 @@ function doScanfor {
         [string]$outfile,
         [DateTime]$hago,
         [string]$dofilter,
+        [string]$filterpatstr,
         [string]$exttochk,
         [string]$exttochkact,
         [string]$unfall,
@@ -238,7 +239,6 @@ function doScanfor {
 
     $startTime = Get-Date
     $drivefull = $drive
-    $textfilterpat = ''
     $wildc = ''
 
     # set up the extensions to look for if looking for images or executables.
@@ -248,110 +248,8 @@ function doScanfor {
          "*.INX", "*.ISU", "*.JOB", "*.JSE", "*.LNK", "*.MSC", "*.MSI", "*.MSP", "*.MST", "*.PAF", "*.PIF", "*.PS1", "*.REG", "*.RGS", `
          "*.SCR", "*.SCT", "*.SHB", "*.SHS", "*.U3P", "*.VB", "*.VBE", "*.VBS", "*.VBSCRIPT", "*.WS", "*.WSF", "*.WSH" }
 
-    # create a filter for common noisy dirs with changes not of interest. Note even with filter highlited files will intentionaly show up
-    if ($dofilter -ieq 'Y' ) {
-        &{ # should be a function but can't be because this is kicked off as a job in a seperate thread and it cannot functions outside the thread
-            # Used in a filter so any dirs need to have \ escaped to \\ also other special characters e.g. \(\)
-            $patsp = "|" 
-            $winddir = $env:WINDIR.Replace("\", "\\") + "\\"
-            $sysmdrv = $winddir[0] + ":"
-            $homedir = $env:USERPROFILE.Replace("\", "\\")
-            $tempRot = $(Split-Path -Path $env:TEMP -Parent).Replace("\", "\\")
-            $tempusr = $env:TMP.Replace("\", "\\")
-            $prgfles = $env:ProgramFiles.Replace("\", "\\")
-            $prgfl86 = ([System.Environment]::GetFolderPath("ProgramFilesX86").Replace("\", "\\")).Replace("(", "\(").Replace(")", "\)")
-            $pgmdata = [System.Environment]::GetFolderPath("CommonApplicationData").Replace("\", "\\") 
-
-            # Add others here as required
-            $textfilterpat += `
-                $winddir + $patsp +`
-                $prgfl86 + "\\Steam" + $patsp +`
-                $prgfl86 + "\\Google" + $patsp +`
-                $prgfl86 + "\\Microsoft\\Edge" + $patsp +`
-                $prgfl86 + "\\Epic Games\\" + $patsp +`
-                $prgfl86 + "\\Microsoft OneDrive" + $patsp +`
-                $prgfles + "\\Microsoft Office" + $patsp +`
-                $prgfles + "\\Common Files\\microsoft shared" + $patsp +`
-                $prgfles + "\\Adobe" + $patsp +`
-                $prgfles + "\\Common Files\\Adobe" + $patsp +`
-                $prgfles + "\\Google\\Chrome\\" + $patsp +`
-                $prgfles + "\\NVIDIA" + $patsp +`
-                $pgmdata + "\\Microsoft\\EdgeUpdate" + $patsp +  
-                $pgmdata + "\\Microsoft\\ClickToRun\\" + $patsp +`
-                $pgmdata + "\\Mozilla" + $patsp +`
-                $pgmdata + "\\NVIDIA Corporation" + $patsp +`
-                $pgmdata + "\\regid." + $patsp +`
-                $pgmdata + "\\USOPrivate\\UpdateStore" + $patsp +`
-                $pgmdata + "\\USOShared\\Logs\\System" + $patsp +`
-                $pgmdata + "\\NVIDIA\\" + $patsp +`
-                $pgmdata + "\\Microsoft\\Windows Defender\\" + $patsp +`
-                $pgmdata + "\\Microsoft\\MapData\\" + $patsp +`
-                $pgmdata + "\\Epic\\" + $patsp +`
-                $sysmdrv + "\\Users\\All Users\\Microsoft\\EdgeUpdate" + $patsp +`
-                $sysmdrv + "\\Users\\All Users\\NVIDIA" + $patsp +`
-                $sysmdrv + "\\Users\\All Users\\regid." + $patsp +`
-                $sysmdrv + "\\Users\\All Users\\USO" + $patsp +`
-                $sysmdrv + "\\Users\\All Users\\USOShared\\Logs\\System\\MoUxCoreWorker" + $patsp +`
-                $sysmdrv + "\\Users\\All Users\\Microsoft\\Windows Defender\\" + $patsp +`
-                $sysmdrv + "\\Users\\All Users\\Microsoft Visual Studio\\" + $patsp +`
-                $sysmdrv + "\\Users\\All Users\\Microsoft\\MapData\\" + $patsp +`
-                $sysmdrv + "\\Users\\All Users\\Epic\\" + $patsp +`
-                $homedir + "\\.vscode" + $patsp +`
-                $homedir + "\\AppData\\Local\\ConnectedDevicesPlatform" + $patsp +`
-                $homedir + "\\AppData\\Local\\D3DSCache" + $patsp +`
-                $homedir + "\\AppData\\Local\\Google\\Chrome" + $patsp +`
-                $homedir + "\\AppData\\Local\\Microsoft" + $patsp +`
-                $homedir + "\\AppData\\Local\\Mozilla" + $patsp +`
-                $homedir + "\\AppData\\Local\\npm-cache" + $patsp +`
-                $homedir + "\\AppData\\Local\\NVIDIA" + $patsp +`
-                $homedir + "\\AppData\\Local\\Packages\\Microsoft" + $patsp +`
-                $homedir + "\\AppData\\Local\\Packages\\MicrosoftWindows" + $patsp +`
-                $homedir + "\\AppData\\Local\\Steam" + $patsp +`
-                $tempRot + "\\system\\CreativeCloud" + $patsp +`
-                $tempusr + "\\NGL\\NGLClient_" + $patsp +`
-                $homedir + "\\AppData\\LocalLow\\Microsoft" + $patsp +`
-                $homedir + "\\AppData\\Roaming\\Adobe" + $patsp +`
-                $homedir + "\\AppData\\Roaming\\Code" + $patsp +`
-                $homedir + "\\AppData\\Roaming\\Mozilla\\" + $patsp +`
-                $homedir + "\\AppData\\Roaming\\Microsoft\\Windows\\Recent\\CustomDestinations" + $patsp +`
-                $homedir + "\\AppData\\Local\\Adobe\\OOBE\\" + $patsp +`
-                $homedir + "\\AppData\\Roaming\\com.adobe.dunamis\\" + $patsp +`
-                $homedir + "\\AppData\\Roaming\\Microsoft\\Spelling\\" + $patsp +`
-                $homedir + "\\AppData\\Roaming\\Microsoft\\SystemCertificates\\" + $patsp +`
-                $homedir + "\\AppData\\Roaming\\Microsoft\\VisualStudio" + $patsp +`
-                $tempusr + "\\VSWebView2Cache\\" + $patsp +`
-                $homedir + "\\AppData\\Roaming\\Microsoft\\Windows\\" + $patsp +`
-                $homedir + "\\AppData\\Local\\Adobe\\" + $patsp +`
-                $homedir + "\\AppData\\Local\\Programs\\Microsoft VS Code\\" + $patsp +`
-                $homedir + "\\Saved Games\\" + $patsp
-
-            #  on all drives which need filtering for the same dirs
-            $drives = Get-CimInstance -ClassName Win32_LogicalDisk -Filter "DriveType=3" | ForEach-Object { "$($_.DeviceID)" }
-            foreach ($drive in $drives) {
-                $textfilterpat +=  $drive[0] + ":\\SteamLibrary\\steamapps\\workshop" + $patsp
-                $textfilterpat +=  $drive[0] + ":\\SteamLibrary\\steamapps\\common" + $patsp
-                $textfilterpat += "  0 " + $drive[0]+ ":\\"+ $patsp # filter out zero lenght files, special case
-            }
-
-            # anything inside this block cannot modify anything outside it. It behaves like a function due to &{
-            # use $script to acces the var outside it
-            $script:textfilterpat = $textfilterpat
-        }
-    }
-
     # filter out the output file from the result
-    $textfilterpat += $outfile.Replace("\", "\\")
-
-    # For DEBUGGING (requires C drive or ALL is used)
-    <#
-    &{
-        if ($drivefull -eq "C:\*") { # only write it out once
-            $dwdir = (New-Object -ComObject Shell.Application).NameSpace('shell:Downloads').Self.Path
-            $dboutfn = $dwdir + "\" + "filter_" + $dofilter + ".txt"
-            $textfilterpat | Add-Content -Path $dboutfn
-        }
-    }
-    #>
+    $filterpatstr += $outfile.Replace("\", "\\")
 
     # Do the Scan
     # Build dynamic Get-ChildItem parameters
@@ -385,7 +283,7 @@ function doScanfor {
         
     # Do the scan, and apply filter, filter will just contain output file if not set to 'Y' to include
     Get-ChildItem @gciParams | Where-Object $timeFilter | Format-Table LastWriteTime, Length, FullName -AutoSize | Out-String -Width 2048 | Set-Content -Encoding UTF8 $unfall
-    Get-Content $unfall | Select-String -Pattern $textfilterpat -NotMatch | Set-Content -Encoding UTF8 $outfile 
+    Get-Content $unfall | Select-String -Pattern $filterpatstr -NotMatch | Set-Content -Encoding UTF8 $outfile 
 
 
     $midTime = Get-Date
@@ -619,6 +517,105 @@ function postprocess {
 }
 
 ########################################################################
+# create a filter to be used to filter out noisy files not of interest
+#
+function buildfilterpatern { 
+     # create a filter for common noisy dirs with changes not of interest. Note even with filter highlited files will intentionaly show up
+    $patsp = "|" 
+    $winddir = $env:WINDIR.Replace("\", "\\") + "\\"
+    $sysmdrv = $winddir[0] + ":"
+    $homedir = $env:USERPROFILE.Replace("\", "\\")
+    $tempRot = $(Split-Path -Path $env:TEMP -Parent).Replace("\", "\\")
+    $tempusr = $env:TMP.Replace("\", "\\")
+    $prgfles = $env:ProgramFiles.Replace("\", "\\")
+    $prgfl86 = ([System.Environment]::GetFolderPath("ProgramFilesX86").Replace("\", "\\")).Replace("(", "\(").Replace(")", "\)")
+    $pgmdata = [System.Environment]::GetFolderPath("CommonApplicationData").Replace("\", "\\") 
+
+    # Add others here as required
+    $textfilterpat = `
+        $winddir + $patsp +`
+        $prgfl86 + "\\Steam" + $patsp +`
+        $prgfl86 + "\\Google" + $patsp +`
+        $prgfl86 + "\\Microsoft\\Edge" + $patsp +`
+        $prgfl86 + "\\Epic Games\\" + $patsp +`
+        $prgfl86 + "\\Microsoft OneDrive" + $patsp +`
+        $prgfles + "\\Microsoft Office" + $patsp +`
+        $prgfles + "\\Common Files\\microsoft shared" + $patsp +`
+        $prgfles + "\\Adobe" + $patsp +`
+        $prgfles + "\\Common Files\\Adobe" + $patsp +`
+        $prgfles + "\\Google\\Chrome\\" + $patsp +`
+        $prgfles + "\\NVIDIA" + $patsp +`
+        $pgmdata + "\\Microsoft\\EdgeUpdate" + $patsp +  
+        $pgmdata + "\\Microsoft\\ClickToRun\\" + $patsp +`
+        $pgmdata + "\\Mozilla" + $patsp +`
+        $pgmdata + "\\NVIDIA Corporation" + $patsp +`
+        $pgmdata + "\\regid." + $patsp +`
+        $pgmdata + "\\USOPrivate\\UpdateStore" + $patsp +`
+        $pgmdata + "\\USOShared\\Logs\\System" + $patsp +`
+        $pgmdata + "\\NVIDIA\\" + $patsp +`
+        $pgmdata + "\\Microsoft\\Windows Defender\\" + $patsp +`
+        $pgmdata + "\\Microsoft\\MapData\\" + $patsp +`
+        $pgmdata + "\\Epic\\" + $patsp +`
+        $sysmdrv + "\\Users\\All Users\\Microsoft\\EdgeUpdate" + $patsp +`
+        $sysmdrv + "\\Users\\All Users\\NVIDIA" + $patsp +`
+        $sysmdrv + "\\Users\\All Users\\regid." + $patsp +`
+        $sysmdrv + "\\Users\\All Users\\USO" + $patsp +`
+        $sysmdrv + "\\Users\\All Users\\USOShared\\Logs\\System\\MoUxCoreWorker" + $patsp +`
+        $sysmdrv + "\\Users\\All Users\\Microsoft\\Windows Defender\\" + $patsp +`
+        $sysmdrv + "\\Users\\All Users\\Microsoft Visual Studio\\" + $patsp +`
+        $sysmdrv + "\\Users\\All Users\\Microsoft\\MapData\\" + $patsp +`
+        $sysmdrv + "\\Users\\All Users\\Epic\\" + $patsp +`
+        $homedir + "\\.vscode" + $patsp +`
+        $homedir + "\\AppData\\Local\\ConnectedDevicesPlatform" + $patsp +`
+        $homedir + "\\AppData\\Local\\D3DSCache" + $patsp +`
+        $homedir + "\\AppData\\Local\\Google\\Chrome" + $patsp +`
+        $homedir + "\\AppData\\Local\\Microsoft" + $patsp +`
+        $homedir + "\\AppData\\Local\\Mozilla" + $patsp +`
+        $homedir + "\\AppData\\Local\\npm-cache" + $patsp +`
+        $homedir + "\\AppData\\Local\\NVIDIA" + $patsp +`
+        $homedir + "\\AppData\\Local\\Packages\\Microsoft" + $patsp +`
+        $homedir + "\\AppData\\Local\\Packages\\MicrosoftWindows" + $patsp +`
+        $homedir + "\\AppData\\Local\\Steam" + $patsp +`
+        $tempRot + "\\system\\CreativeCloud" + $patsp +`
+        $tempusr + "\\NGL\\NGLClient_" + $patsp +`
+        $homedir + "\\AppData\\LocalLow\\Microsoft" + $patsp +`
+        $homedir + "\\AppData\\Roaming\\Adobe" + $patsp +`
+        $homedir + "\\AppData\\Roaming\\Code" + $patsp +`
+        $homedir + "\\AppData\\Roaming\\Mozilla\\" + $patsp +`
+        $homedir + "\\AppData\\Roaming\\Microsoft\\Windows\\Recent\\CustomDestinations" + $patsp +`
+        $homedir + "\\AppData\\Local\\Adobe\\OOBE\\" + $patsp +`
+        $homedir + "\\AppData\\Roaming\\com.adobe.dunamis\\" + $patsp +`
+        $homedir + "\\AppData\\Roaming\\Microsoft\\Spelling\\" + $patsp +`
+        $homedir + "\\AppData\\Roaming\\Microsoft\\SystemCertificates\\" + $patsp +`
+        $homedir + "\\AppData\\Roaming\\Microsoft\\VisualStudio" + $patsp +`
+        $tempusr + "\\VSWebView2Cache\\" + $patsp +`
+        $homedir + "\\AppData\\Roaming\\Microsoft\\Windows\\" + $patsp +`
+        $homedir + "\\AppData\\Local\\Adobe\\" + $patsp +`
+        $homedir + "\\AppData\\Local\\Programs\\Microsoft VS Code\\" + $patsp +`
+        $homedir + "\\Saved Games\\" + $patsp
+
+    #  on all drives which need filtering for the same dirs
+    $drives = Get-CimInstance -ClassName Win32_LogicalDisk -Filter "DriveType=3" | ForEach-Object { "$($_.DeviceID)" }
+    foreach ($drive in $drives) {
+        $textfilterpat +=  $drive[0] + ":\\SteamLibrary\\steamapps\\workshop" + $patsp
+        $textfilterpat +=  $drive[0] + ":\\SteamLibrary\\steamapps\\common" + $patsp
+        $textfilterpat += "  0 " + $drive[0]+ ":\\"+ $patsp # filter out zero lenght files, special case
+    }
+    
+    # For DEBUGGING
+    <#
+    &{
+        # dump the filter txt to dowloads dir
+        $dwdir = (New-Object -ComObject Shell.Application).NameSpace('shell:Downloads').Self.Path
+        $dboutfn = $dwdir + "\sfc_debug_filter.txt"
+        $textfilterpat | Add-Content -Path $dboutfn
+    } #>
+
+    return $textfilterpat
+}
+
+
+########################################################################
 # do the scan of single drive without threads
 # only used for debugging
 #
@@ -638,8 +635,10 @@ function Invoke-SingleDriveScan {
 
     $TempFileX = New-TemporaryFile
     $temploc = $WhichDrive + ":\"
+    $filterpatstr = ''
+    if ($FilterApp -eq 'Y') { $filterpatstr = buildfilterpatern }
 
-    $result = doScanfor -drive $temploc -outfile $TempFileX -hago $hoursago -dofilter $FilterApp -exttochk $CheckFor -exttochkact $CheckForExt -unfall $TempUFAll -minSize $CheckForSizeMin -maxSize $CheckForSizeMax -checkforcehidden $CheckHidden -brootonly $false
+    $result = doScanfor -drive $temploc -outfile $TempFileX -hago $hoursago -dofilter $FilterApp -filterpatstr $filterpatstr -exttochk $CheckFor -exttochkact $CheckForExt -unfall $TempUFAll -minSize $CheckForSizeMin -maxSize $CheckForSizeMax -checkforcehidden $CheckHidden -brootonly $false
     showscanduration -Result $result
 
     $txtfilterpat = $OutputFile.Replace("\", "\\") + "|" +`
@@ -688,9 +687,12 @@ function Invoke-DriveScan {
         $TempFilesMap[$driveLetter] += $tempRoot  
         $tempRootUFAll = New-TemporaryFile 
         $TempFilesMapUFAll[$driveLetter] += $tempRootUFAll 
+        $filterpatstr = ''
+        if ($FilterApp -eq 'Y') { $filterpatstr = buildfilterpatern }
 
         # create drive root level job
-        $jobs += Start-Job -ScriptBlock ${function:doScanfor} -ArgumentList (Join-Path $drive "\*"), $tempRoot, $hoursago, $FilterApp, $CheckFor, $CheckForExt, $tempRootUFAll, $CheckForSizeMin, $CheckForSizeMax, $CheckHidden, $true
+        $jobs += Start-Job -ScriptBlock ${function:doScanfor} -ArgumentList (Join-Path $drive "\*"), $tempRoot, $hoursago, $FilterApp, $filterpatstr, `
+            $CheckFor, $CheckForExt, $tempRootUFAll, $CheckForSizeMin, $CheckForSizeMax, $CheckHidden, $true
 
         # one thread for each directory at root level with recurse
         $subDirs = @(Get-ChildItem -Path $(Join-Path $drive "\") -Directory -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName)
@@ -701,7 +703,8 @@ function Invoke-DriveScan {
             $TempFilesMapUFAll[$driveLetter] += $tempSubUFAll
 
             # create recurse root level directories job
-            $jobs += Start-Job -ScriptBlock ${function:doScanfor} -ArgumentList ($dir + '\'), $tempSub, $hoursago, $FilterApp, $CheckFor, $CheckForExt, $tempSubUFAll, $CheckForSizeMin, $CheckForSizeMax, $CheckHidden, $false
+            $jobs += Start-Job -ScriptBlock ${function:doScanfor} -ArgumentList ($dir + '\'), $tempSub, $hoursago, $FilterApp, $filterpatstr, `
+                $CheckFor, $CheckForExt, $tempSubUFAll, $CheckForSizeMin, $CheckForSizeMax, $CheckHidden, $false
         }
     }
 
