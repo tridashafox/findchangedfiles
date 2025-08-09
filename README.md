@@ -62,25 +62,11 @@ The script will ask for all the options, or they can be passed as switches on th
 
 ### Example 1 - will run with no prompting
 
-`powershell -File '.\scanforchangeshours_fv2.ps1' `
-  `-CleanTempFiles N `
-  `-HoursToCheck -3 `
-  `-WhichDrive ALL `
-  `-CheckFor ALL `
-  `-CheckHidden Y `
-  `-CheckForSizeMin 0 `
-  `-CheckForSizeMax -1 `
-  `-FilterApp Y `
-  `-ShowHighlights Y `
-  `-CopyHighlights N `
-  `-CopyMetaInfo N `
-  `-CopyReportErrors N`
+`powershell -File "scanforchangeshours_fv2.ps1" -CleanTempFiles N -HoursToCheck -3 -WhichDrive ALL -CheckFor ALL -CheckHidden Y -CheckForSizeMin 0  -CheckForSizeMax -1 -FilterApp Y -ShowHighlights Y -CopyHighlights N -CopyMetaInfo N -CopyReportErrors N`
 
 ### Example 2 - run with prompting but change one of the defaults
 
-`powershell -File '.\scanforchangeshours_fv2.ps1' `
- `-ModDefault Y `
- `-CheckFor IMG `
+`powershell -File "scanforchangeshours_fv2.ps1" -ModDefault Y -CheckFor IMG `
 
 ### Beware
 
@@ -88,7 +74,7 @@ The script will ask for all the options, or they can be passed as switches on th
 > You must open a PowerShell terminal to run scripts with bypassed execution policy, or use a batch file or Visual Studio Code.
 
 ```
-powershell -ExecutionPolicy ByPass -File .\scanforchangeshours_fv2.ps1
+powershell -ExecutionPolicy ByPass -File scanforchangeshours_fv2.ps1
 ```
 ### Additional Notes
 
