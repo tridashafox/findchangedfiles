@@ -28,6 +28,7 @@
 # using multiple threading add a lot of complications and restrictions
 
 # TODO
+# allow different filter options (None, Light, Full)
 # move extension lists into function near buildfilters
 # allow a directory to be scanned rather than just a drive
 # add functional tests (lol)
@@ -613,7 +614,6 @@ function buildfilterpatern {
 
     return $textfilterpat
 }
-
 
 ########################################################################
 # do the scan of single drive without threads
