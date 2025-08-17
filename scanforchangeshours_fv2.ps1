@@ -767,6 +767,7 @@ $dwdir = (New-Object -ComObject Shell.Application).NameSpace('shell:Downloads').
 $Drives = Get-CimInstance -ClassName Win32_LogicalDisk -Filter "DriveType=3" | ForEach-Object { "$($_.DeviceID)" }
 $OutputFile = $dwdir + "\result.txt"
 $ExtsToHilight = @(".exe", ".bat", ".pdf", ".jpg", ".png", ".docx", ".mp4", ".tif", ".tiff", ".webp", ".afphoto", ".psd", ".pic", ".jpeg")
+if ($ModDefault -eq "" -or $ModDefault -eq "N") { $ModDefault = $null}
 clearpressedkeys
 
 # Options: Use run cleaner option
@@ -787,8 +788,8 @@ $CleanTempFiles = getYNinput $ModDefault $CleanTempFiles "CleanTempFiles" "Use W
     For the same value and logic a change of type changes the behavior. 
 #>
 $msgBadHours = "The number of hours to look back must be a negative."
-if ($HoursToCheck -eq $null -or $ModDefault) {
-    if ($ModDefault -and $HoursToCheck) { $defval = $HoursToCheck } else { $defval = -3}
+if ($HoursToCheck -eq 0 -or $ModDefault) {
+    if ($ModDefault -and $HoursToCheck -ge 0) { $defval = $HoursToCheck } else { $defval = -3}
     while ($true) {
         $HoursToCheck = [double](Read-Host "Enter the hours to add to Now to look for changes: [default $defval]" )
         if (!$HoursToCheck) { $HoursToCheck = $defval } 
