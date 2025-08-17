@@ -788,7 +788,7 @@ $CleanTempFiles = getYNinput $ModDefault $CleanTempFiles "CleanTempFiles" "Use W
     For the same value and logic a change of type changes the behavior. 
 #>
 $msgBadHours = "The number of hours to look back must be a negative."
-if ($HoursToCheck -eq 0 -or $ModDefault) {
+if ($HoursToCheck -ge 0 -or $ModDefault) {
     if ($ModDefault -and $HoursToCheck -ge 0) { $defval = $HoursToCheck } else { $defval = -3}
     while ($true) {
         $HoursToCheck = [double](Read-Host "Enter the hours to add to Now to look for changes: [default $defval]" )
