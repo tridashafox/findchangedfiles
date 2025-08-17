@@ -789,7 +789,7 @@ $CleanTempFiles = getYNinput $ModDefault $CleanTempFiles "CleanTempFiles" "Use W
 #>
 $msgBadHours = "The number of hours to look back must be a negative."
 if ($HoursToCheck -ge 0 -or $ModDefault) {
-    if ($ModDefault -and $HoursToCheck -ge 0) { $defval = $HoursToCheck } else { $defval = -3}
+    if ($ModDefault -and $HoursToCheck -lt 0) { $defval = $HoursToCheck } else { $defval = -3}
     while ($true) {
         $HoursToCheck = [double](Read-Host "Enter the hours to add to Now to look for changes: [default $defval]" )
         if (!$HoursToCheck) { $HoursToCheck = $defval } 
