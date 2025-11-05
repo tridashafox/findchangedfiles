@@ -368,7 +368,7 @@ function findfilestohighlight {
     # add title and put into output files if there is anything to report.
     if ($filesToCopy.Count -gt 0) {
         Add-Content -Path $outfile -Value ""
-        $filteredtitle = "Highlights - Key file types which changed (exe,bat,pdf,jpg,png,docx,mp4,tiff,webp,afphoto,psd,pic):"
+        $filteredtitle = "Highlights - Key file types which changed (exe,bat,pdf,jpg,png,gif,ico,docx,mp4,tiff,webp,afphoto,psd,pic):"
         Add-Content -Path $outfile -Value $filteredtitle -Encoding UTF8
         Add-Content -Path $outfile -Value ""
         $filesToCopy | Add-Content -Path $outfile -Encoding UTF8
@@ -766,7 +766,7 @@ function Invoke-DriveScan {
 $dwdir = (New-Object -ComObject Shell.Application).NameSpace('shell:Downloads').Self.Path
 $Drives = Get-CimInstance -ClassName Win32_LogicalDisk -Filter "DriveType=3" | ForEach-Object { "$($_.DeviceID)" }
 $OutputFile = $dwdir + "\result.txt"
-$ExtsToHilight = @(".exe", ".bat", ".pdf", ".jpg", ".png", ".docx", ".mp4", ".tif", ".tiff", ".webp", ".afphoto", ".psd", ".pic", ".jpeg")
+$ExtsToHilight = @(".exe", ".bat", ".pdf", ".jpg", ".png", ".gif", ".ico", ".docx", ".mp4", ".tif", ".tiff", ".webp", ".afphoto", ".psd", ".pic", ".jpeg")
 if ($ModDefault -eq "" -or $ModDefault -eq "N") { $ModDefault = $null}
 clearpressedkeys
 
