@@ -186,6 +186,65 @@ function getYNinput {
 }
 
 ########################################################################
+# Parse results file and display a summary of file counts in directories
+# NOTE will fail if any of the formating of the output is changed
+# Usage examples:
+# Get-DirectoryFileCounts -Filename "your_file.txt"
+#
+function Get-DirectoryFileCounts {
+    param(
+        [Parameter(Mandatory=$true)]
+        [string]$Filename
+    )
+    
+    $drivePattern = '\b([a-zA-Z]):\\'
+    $dirCounts = @{}
+    $stopProcessing = $false
+
+    Get-Content $Filename | ForEach-Object {
+        $line = $_
+        
+        # Stop processing once "Highlights -" section starts
+        if ($line.TrimStart().StartsWith("Highlights -")) {
+            $stopProcessing = $true
+            return
+        }
+        
+        if ($stopProcessing) {
+            return
+        }
+
+        # Skip excluded lines
+        if ($line.Trim().StartsWith("Time taken:") -or
+            $line.ToLower().Contains("highlighted") -or
+            $line.Contains("number of modified")) {
+            return
+        }
+        
+        # Find drive letter pattern and trim everything before it
+        if ($line -match $drivePattern) {
+            $fullMatch = $matches[0]
+            $drivePos = $line.IndexOf($fullMatch)
+            $trimmedPath = $line.Substring($drivePos).Trim()
+            
+            # Get parent directory
+            $parentDir = Split-Path $trimmedPath -Parent
+            if (-not $dirCounts.ContainsKey($parentDir)) {
+                $dirCounts[$parentDir] = 0
+            }
+            $dirCounts[$parentDir]++
+        }
+    }
+
+    $dirCounts.GetEnumerator() | Sort-Object Name | ForEach-Object {
+        $count = $_.Value
+        $directory = $_.Name
+        $countStr = $count.ToString("D5")  # D6 = 6 digits, right-aligned with spaces
+        Write-Output "$countStr  $directory"
+    }
+}
+
+########################################################################
 # wait for jobs to complete with progress dots
 #
 function watchjobprogress {
@@ -912,6 +971,16 @@ if ( $WhichDrive -ne 'ALL') { $drivestoscan = @($WhichDrive + ":") } else { $dri
 
 # Do the scan and get the results with multiple threads to improve time taken
 Invoke-DriveScan -Drives $drivestoscan -OutputFile $OutputFile -hoursago $hoursago -FilterApp $FilterApp -CheckFor $CheckFor -CheckForExt $CheckForExt -TempUFAll $TempUFAll -CheckForSizeMin $CheckForSizeMin -CheckForSizeMax $CheckForSizeMax -CheckHidden $CheckHidden
+
+# add a summary of directory counts to the output
+if (Test-Path $OutputFile) {
+    $TempSumDirCnt = New-TemporaryFile
+    "`nSummary counts of directories:`n" | Out-File -FilePath $TempSumDirCnt -Encoding UTF8
+    Get-DirectoryFileCounts -Filename $OutputFile | Out-File -FilePath $TempSumDirCnt -Append -Encoding UTF8
+    "`n" | Out-File -FilePath $TempSumDirCnt -Append -Encoding UTF8
+    Get-Content $TempSumDirCnt | Out-File -FilePath $OutputFile -Append -Encoding UTF8
+    Remove-Item $TempSumDirCnt
+}
 
 # create a location to store the results and any highlited files
 $resfldpath = createoutputdir
