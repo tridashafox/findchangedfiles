@@ -302,7 +302,7 @@ function doScanfor {
     $wildc = ''
 
     # set up the extensions to look for if looking for images or executables.
-    if ( $exttochk -ieq 'IMG' ) { $wildc = "*.BMP", "*.GIF", "*.JPG", "*.JPEG", "*.PNG", "*.TIF", "*.TIFF", "*.ICO" , "*.DDS", "*.MP4", "*.MOV", "*.WebM", "*.AVI", "*.WMV", "*.Webp", "*.afphoto", "*.psd", "*.pic" } 
+    if ( $exttochk -ieq 'IMG' ) { $wildc = "*.BMP", "*.GIF", "*.JPG", "*.JPEG", "*.PNG", "*.TIF", "*.TIFF", "*.ICO" , "*.DDS", "*.MP4", "*.MOV", "*.WebM", "*.AVI", "*.WMV", "*.Webm", "*.Webp", "*.afphoto", "*.psd", "*.pic" } 
     if ( $exttochk -ieq 'EXT' ) { $wildc = "*." + $exttochkact }
     if ( $exttochk -ieq 'EXE' ) { $wildc = "*.BAT", "*.PS1", "*.BIN", "*.CMD", "*.COM", "*.CPL", "*.EXE", "*.GADGET", "*.INF1", "*.INS",`
          "*.INX", "*.ISU", "*.JOB", "*.JSE", "*.LNK", "*.MSC", "*.MSI", "*.MSP", "*.MST", "*.PAF", "*.PIF", "*.PS1", "*.REG", "*.RGS", `
@@ -825,7 +825,7 @@ function Invoke-DriveScan {
 $dwdir = (New-Object -ComObject Shell.Application).NameSpace('shell:Downloads').Self.Path
 $Drives = Get-CimInstance -ClassName Win32_LogicalDisk -Filter "DriveType=3" | ForEach-Object { "$($_.DeviceID)" }
 $OutputFile = $dwdir + "\result.txt"
-$ExtsToHilight = @(".exe", ".bat", ".pdf", ".jpg", ".png", ".gif", ".ico", ".docx", ".mp4", ".tif", ".tiff", ".webp", ".afphoto", ".psd", ".pic", ".jpeg")
+$ExtsToHilight = @(".exe", ".bat", ".pdf", ".jpg", ".png", ".gif", ".ico", ".docx", ".mp4", ".tif", ".tiff", ".webm", ".webp", ".afphoto", ".psd", ".pic", ".jpeg")
 if ($ModDefault -eq "" -or $ModDefault -eq "N") { $ModDefault = $null}
 clearpressedkeys
 
