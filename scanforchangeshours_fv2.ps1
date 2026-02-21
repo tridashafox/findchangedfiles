@@ -475,6 +475,7 @@ function findfilestohighlight {
             $counterstart = 1 # start at 1 - zero is used for the log output
             $counter = $counterstart
             $countercpErr = 0
+            $skippedcnt = 0
             foreach ($line in $filesToCopy) {
                 $filename = ($line -split ' ', 4)[-1]  # Split into 4 parts, take the last part
                 $filename = $filename.Trim()
@@ -507,24 +508,33 @@ function findfilestohighlight {
                         if ($baseFileName -ne '') {
                             $newFileName = "{0}{2}{1:D8}{2}{3}" -f $pathhash, $counter, $fnsep, $partname.Name
                             $counter++
+                            $shouldSkip = $false
+                            
+                            # Debug or make a param as filter does not work - exclude some dirs from highlight copy if specified 
+                            # $excludePathsDdg = @("C:\dir\") 
+                            # foreach ($excludeDdg in $excludePathsDdg) { if ($filename.Length -ge $excludeDdg.Length -and $filename.Substring(0, $excludeDdg.Length) -ieq $excludeDdg) { $shouldSkip = $true; $skippedcnt++; break } }
 
-                            # copy the file
-                            try {
-                                $newFileName = Join-Path $tempFolderPath $newFileName
-                                Copy-Item -LiteralPath $filename -Destination $newFileName -Force -ErrorAction SilentlyContinue
-                            } 
-                            catch [System.UnauthorizedAccessException] {
-                                $countercpErr++
-                                if ($copyrpterr -eq 'Y') {
-                                    $notfoundtocopyerror = $filename + " highlighted file could not be copied due to System.UnauthorizedAccessException"
-                                    Add-Content -Path $outfile -Value $notfoundtocopyerror -Encoding UTF8
+                            if (-not $shouldSkip) 
+                            {
+                                # copy the file
+                                try {
+                                    $newFileName = Join-Path $tempFolderPath $newFileName
+
+                                    Copy-Item -LiteralPath $filename -Destination $newFileName -Force -ErrorAction SilentlyContinue
+                                } 
+                                catch [System.UnauthorizedAccessException] {
+                                    $countercpErr++
+                                    if ($copyrpterr -eq 'Y') {
+                                        $notfoundtocopyerror = $filename + " highlighted file could not be copied due to System.UnauthorizedAccessException"
+                                        Add-Content -Path $outfile -Value $notfoundtocopyerror -Encoding UTF8
+                                    }
                                 }
-                            }
-                            catch [System.IO.PathTooLongException] {
-                                $countercpErr++
-                                if ($copyrpterr -eq 'Y') {
-                                    $notfoundtocopyerror = "$filename could not be copied due to PathTooLongException (exceeds MAX_PATH)"
-                                    Add-Content -Path $outfile -Value $notfoundtocopyerror -Encoding UTF8
+                                catch [System.IO.PathTooLongException] {
+                                    $countercpErr++
+                                    if ($copyrpterr -eq 'Y') {
+                                        $notfoundtocopyerror = "$filename could not be copied due to PathTooLongException (exceeds MAX_PATH)"
+                                        Add-Content -Path $outfile -Value $notfoundtocopyerror -Encoding UTF8
+                                    }
                                 }
                             }
 
@@ -569,10 +579,14 @@ function findfilestohighlight {
             if ($counter -gt $counterstart) { 
                 $highlitecopyinfotext = $nnewline + $($counter - $counterstart) + " highlighted files were copied to " + $tempFolderPath 
                 Add-Content -Path $outfile -Value $highlitecopyinfotext -Encoding UTF8
-                $nnewline = ''
+                # $nnewline = ''
             }
             if ($countercpErr -gt 0) { 
                 $highlitecopyinfotext =  $nnewline + $countercpErr + " highlighted files could not be copied to " + $tempFolderPath
+                Add-Content -Path $outfile -Value $highlitecopyinfotext -Encoding UTF8
+            }
+            if ($skippedcnt -gt 0) {
+                $highlitecopyinfotext =  $nnewline + $skippedcnt + " highlighted files where skipped in copy operation " + $tempFolderPath
                 Add-Content -Path $outfile -Value $highlitecopyinfotext -Encoding UTF8
             }
         }
