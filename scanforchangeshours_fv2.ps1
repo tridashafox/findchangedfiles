@@ -37,7 +37,7 @@
 param (
     [string]$ModDefault,        # Y means the below changes the default rather than passes the value, default is N
     [string]$CleanTempFiles,    # Y if want to run windows cleanmgr before running scan, default is N
-    [double]$HoursToCheck,      # Number of hours to look back for changes, default is -3, note this can have a decimal point e.g. -0.5 (last half-hour)
+    [double]$HoursToCheck,      # Number of hours to look back for changes, default is -3, note this can have a decimal point e.g. -0.5 (last half-hour). If postive looks for changed files before specified hours.
     [string]$WhichDrive,        # Which drive to scan, or all drives, default is ALL
     [string]$CheckFor,          # Which types of files to check for, can be  is ALL, IMG (anything at is an Image), EXT (askes for an CheckForExt), EXE (anything that executes), default is ALL
     [string]$CheckForExt,       # A specific extension to scan for (don't include the '.' before the extension), default PNG. Ignored unless CheckFor is EXT
@@ -156,6 +156,26 @@ function relocateoutput {
     Move-Item -LiteralPath $OutputFile -Destination $newPath -Force
     Write-Host "Result placed in $newPath."
 }
+
+########################################################################
+# create a has for a directory path
+#
+function getpathash {
+    param([string]$Path)
+    
+    # Get relative depth and name
+    $parts = $Path -split '[\\/]' | Where-Object {$_}
+    $depth = $parts.Count
+    $name = $parts[-1].Substring(0, [Math]::Min(8, $parts[-1].Length))
+    
+    # Simple hash of name + depth
+    $hashBytes = [System.Text.Encoding]::UTF8.GetBytes($name)
+    $hash = 0
+    foreach ($b in $hashBytes) { $hash = ($hash * 31) + $b }
+    
+    return "{0:D2}{1}" -f $depth, ($hash % 1000000).ToString('D6')
+}
+
 
 ########################################################################
 # handle Y/N questions
@@ -285,6 +305,7 @@ function doScanfor {
     param (
         [string]$drive,
         [string]$outfile,
+        [string]$hrdir,
         [DateTime]$hago,
         [string]$dofilter,
         [string]$filterpatstr,
@@ -330,11 +351,14 @@ function doScanfor {
     }
 
     # Base filter
-    $timeFilter = { $_.LastWriteTime -gt $hago -and $_.Length -ge $minSize }
+    $hx = ($hrdir -eq "after") 
+    if ($hx) { $timeFilter = { $_.LastWriteTime -gt $hago -and $_.Length -ge $minSize } }
+    else     { $timeFilter = { $_.LastWriteTime -lt $hago -and $_.Length -ge $minSize } }
 
     # Add size limit if maxSize is specified
     if ($maxSize -ne -1) {
-        $timeFilter = { $_.LastWriteTime -gt $hago -and $_.Length -ge $minSize -and $_.Length -le $maxSize }
+         if ( $hx) { $timeFilter = { $_.LastWriteTime -gt $hago -and $_.Length -ge $minSize -and $_.Length -le $maxSize } }
+         else      { $timeFilter = { $_.LastWriteTime -lt $hago -and $_.Length -ge $minSize -and $_.Length -le $maxSize } }
     }
 
     if ($wildc -ne '') {
@@ -344,7 +368,6 @@ function doScanfor {
     # Do the scan, and apply filter, filter will just contain output file if not set to 'Y' to include
     Get-ChildItem @gciParams | Where-Object $timeFilter | Format-Table LastWriteTime, Length, FullName -AutoSize | Out-String -Width 2048 | Set-Content -Encoding UTF8 $unfall
     Get-Content $unfall | Select-String -Pattern $filterpatstr -NotMatch | Set-Content -Encoding UTF8 $outfile 
-
 
     $midTime = Get-Date
 
@@ -454,6 +477,9 @@ function findfilestohighlight {
                             $partname = Get-Item -LiteralPath $filename -Force # -Force needed for files marked as hidden
                             $fullPathStr = $partname.FullName
                             $baseFileName = $partname.BaseName
+                            $dirpathonly = $partname.Directory.FullName
+                            $pathhash = getpathash $dirpathonly
+                            
                             <# 
                             # Old method converts th path into a name c--dir1--dir2--file1.txt
                             $relativePath = $fullPathStr.Substring(3)  # Strip drive letter like C:\
@@ -471,7 +497,7 @@ function findfilestohighlight {
                             }
                         }
                         if ($baseFileName -ne '') {
-                            $newFileName = "{0:D8}{1}{2}" -f $counter, $fnsep, $partname.Name
+                            $newFileName = "{0}{2}{1:D8}{2}{3}" -f $pathhash, $counter, $fnsep, $partname.Name
                             $counter++
 
                             # copy the file
@@ -503,6 +529,7 @@ function findfilestohighlight {
                                         originalPath1     = $fullPathStr
                                         originalPath2     = $fullPathStr.Replace("\", "/")
                                         originalname      = Split-Path $srcfileInfo -Leaf
+                                        dirpathhash       = $pathhash
                                         filesize          = "{0:N2} KB" -f ($srcfileInfo.Length / 1KB)
                                         lastwritetime     = $srcfileInfo.LastWriteTime.ToString("yyyy-MM-dd HH:mm:ss")
                                         lastmodifed       = $((New-TimeSpan -Start $srcfileInfo.LastWriteTime).TotalMinutes).ToString("N2") + " mins"
@@ -681,6 +708,7 @@ function buildfilterpatern {
 function Invoke-SingleDriveScan {
     param (
         [Parameter(Mandatory=$true)][string]$WhichDrive,
+        [string]$hourdirection,
         [datetime]$hoursago,
         $FilterApp,
         $CheckFor,
@@ -692,12 +720,15 @@ function Invoke-SingleDriveScan {
         [string]$OutputFile
     )
 
+    # Scans one drive at a time so drive must be a single letter and not ALL
+    if ($WhichDrive.Length -gt 1) { Write-Host "[Error] Invalid drive letter '$WhichDrive' passed to function Invoke-SingleDriveScan.`n" -ForegroundColor Red; exit 1}
+
     $TempFileX = New-TemporaryFile
     $temploc = $WhichDrive + ":\"
     $filterpatstr = ''
     if ($FilterApp -eq 'Y') { $filterpatstr = buildfilterpatern }
 
-    $result = doScanfor -drive $temploc -outfile $TempFileX -hago $hoursago -dofilter $FilterApp -filterpatstr $filterpatstr -exttochk $CheckFor -exttochkact $CheckForExt -unfall $TempUFAll -minSize $CheckForSizeMin -maxSize $CheckForSizeMax -checkforcehidden $CheckHidden -brootonly $false
+    $result = doScanfor -drive $temploc -outfile $TempFileX -hrdir $hourdirection -hago $hoursago -dofilter $FilterApp -filterpatstr $filterpatstr -exttochk $CheckFor -exttochkact $CheckForExt -unfall $TempUFAll -minSize $CheckForSizeMin -maxSize $CheckForSizeMax -checkforcehidden $CheckHidden -brootonly $false
     showscanduration -Result $result
 
     $txtfilterpat = $OutputFile.Replace("\", "\\") + "|" +`
@@ -718,6 +749,7 @@ function Invoke-SingleDriveScan {
 function Invoke-DriveScan {
     param (
         [Parameter(Mandatory=$true)][string[]]$Drives,
+        [string]$hourdirection,
         [datetime]$hoursago,
         $FilterApp,
         $CheckFor,
@@ -750,7 +782,7 @@ function Invoke-DriveScan {
         if ($FilterApp -eq 'Y') { $filterpatstr = buildfilterpatern }
 
         # create drive root level job
-        $jobs += Start-Job -ScriptBlock ${function:doScanfor} -ArgumentList (Join-Path $drive "\*"), $tempRoot, $hoursago, $FilterApp, $filterpatstr, `
+        $jobs += Start-Job -ScriptBlock ${function:doScanfor} -ArgumentList (Join-Path $drive "\*"), $tempRoot, $hourdirection, $hoursago, $FilterApp, $filterpatstr, `
             $CheckFor, $CheckForExt, $tempRootUFAll, $CheckForSizeMin, $CheckForSizeMax, $CheckHidden, $true
 
         # one thread for each directory at root level with recurse
@@ -762,7 +794,7 @@ function Invoke-DriveScan {
             $TempFilesMapUFAll[$driveLetter] += $tempSubUFAll
 
             # create recurse root level directories job
-            $jobs += Start-Job -ScriptBlock ${function:doScanfor} -ArgumentList ($dir + '\'), $tempSub, $hoursago, $FilterApp, $filterpatstr, `
+            $jobs += Start-Job -ScriptBlock ${function:doScanfor} -ArgumentList ($dir + '\'), $tempSub, $hourdirection, $hoursago, $FilterApp, $filterpatstr, `
                 $CheckFor, $CheckForExt, $tempSubUFAll, $CheckForSizeMin, $CheckForSizeMax, $CheckHidden, $false
         }
     }
@@ -846,15 +878,20 @@ $CleanTempFiles = getYNinput $ModDefault $CleanTempFiles "CleanTempFiles" "Use W
     
     For the same value and logic a change of type changes the behavior. 
 #>
-$msgBadHours = "The number of hours to look back must be a negative."
-if ($HoursToCheck -ge 0 -or $ModDefault) {
+if ($HoursToCheck -eq 0 -or $ModDefault) {
     if ($ModDefault -and $HoursToCheck -lt 0) { $defval = $HoursToCheck } else { $defval = -3}
-    while ($true) {
-        $HoursToCheck = [double](Read-Host "Enter the hours to add to Now to look for changes: [default $defval]" )
-        if (!$HoursToCheck) { $HoursToCheck = $defval } 
-        if ($HoursToCheck -ge 0) { Write-Host $msgBadHours -ForegroundColor Red } else { break }
+    $invvuhr = $true
+    while ($invvuhr)
+    {
+        $invvuhr = $false
+        try {  $HoursToCheck = [double](Read-Host "Enter the hours to add to Now to look for changes: [default $defval]" ) }
+        catch { $invvuhr = $true; Write-Host "Input must be a number (e.g. 1, 2.5, -3). Try again." -ForegroundColor Yellow }
+        if (!$invvuhr -and !$HoursToCheck) { $HoursToCheck = $defval; } 
     }
-} elseif ($HoursToCheck -ge 0) { Write-Host "Invalid HoursToCheck. $msgBadHours" -ForegroundColor Red; exit 1 }
+} 
+
+if ($HoursToCheck -eq 0) { Write-Host "Invalid HoursToCheck. Must not be zero." -ForegroundColor Red; exit 1 }
+if ($HoursToCheck -ge 0) { Write-Host "Warning: Positive number entered. Scan will look for files older than specified hours." -ForegroundColor Yellow }
 
 # Options: What drives to scan 
 $validDrives = @('ALL') + ($Drives -replace ':')  
@@ -864,7 +901,7 @@ if (!$WhichDrive -or $ModDefault) {
         $driveStringPrompt = "Which drive? (ALL/" + ((@($Drives) -replace ':') -join '/') + "): [default $defval]"
         $WhichDrive = $(Read-Host $driveStringPrompt).ToUpper()
         if ($WhichDrive -ieq '') { $WhichDrive = $defval }
-        if (-not ($validDrives -contains $WhichDrive)) { Write-Host "Invalid drive requested. Valid drives are $validDrives." -ForegroundColor Red } else { break }
+        if (-not ($validDrives -contains $WhichDrive)) { Write-Host "Invalid drive requested. Valid drives are $validDrives." -ForegroundColor Yellow } else { break }
     }
 } elseif (-not ($validDrives -contains $WhichDrive)) { Write-Host "Invalid WhichDrive value. Valid drives are $validDrives." -ForegroundColor Red; exit 1 }
 
@@ -889,13 +926,15 @@ if ($CheckFor -eq 'EXT') {
 
 # Options: Scan hidden files - can have x3 slowdown
 $CheckHidden = getYNinput $ModDefault $CheckHidden "CheckHidden" "Look for hidden files? (NB: If Y will be slower due to access errors)" 'N'
+
 # Options: Size
-if ($CheckForSizeMin -eq $null -or $ModDefault) { 
+# debuger sets uninitialised values to 0, while if run from cmd line it is set to $null, so can't use $null to see if specified.
+if (-not $PSBoundParameters.ContainsKey('CheckForSizeMin') -or $ModDefault) { 
     if ($ModDefault -and $CheckForSizeMin) { $defval = $CheckForSizeMin } else { $defval = '0' }
     $CheckForSizeMin = Read-Host "Look only for files that are larger than n bytes?: [default $defval]" 
     if ($CheckForSizeMin -ieq '') { $CheckForSizeMin = $defval }
 }
-if ($CheckForSizeMax -eq $null -or $ModDefault) { 
+if (-not $PSBoundParameters.ContainsKey('CheckForSizeMax') -or $ModDefault) { 
     if ($ModDefault -and $CheckForSizeMax) { $defval = $CheckForSizeMax } else { $defval = '-1' }
     $CheckForSizeMax = Read-Host "Look only for files that are smaller than n bytes?: [default $defval (not limited)]"
     if ( $CheckForSizeMax -ieq '' ) { $CheckForSizeMax = '-1'}
@@ -910,7 +949,7 @@ $ShowHighlights = getYNinput $ModDefault $ShowHighlights "ShowHighlights" "Highl
 if ($ShowHighlights -ieq 'Y') { 
     if ($CheckFor -ieq 'ALL') { $inyndef =  'N' } else { $inyndef =  'Y' }
     $CopyHighlights   = getYNinput $ModDefault $CopyHighlights   "CopyHighlights"   "Copy highlighted files to an output directory?" $inyndef 
-    $CopyMetaInfo     = getYNinput $ModDefault $CopyMetaInfo     "CopyMetaInfo"     "Create a [fn].meta.json with path info for each copied highlighted file an output directory?" $inyndef 
+    $CopyMetaInfo     = getYNinput $ModDefault $CopyMetaInfo     "CopyMetaInfo"     "Create a [fn].meta.json with path info for each copied highlighted file an output directory?" 'N'
     $CopyReportErrors = getYNinput $ModDefault $CopyReportErrors "CopyReportErrors" "Report errors when copying highlighted files to an output directory?" 'N'
 } else { 
     $CopyHighlights = 'N'
@@ -934,7 +973,13 @@ if ( $cleantempfiles -ieq 'Y' ) {
 
 # Message to say what the scan will be doing
 
-$hoursago = (Get-Date).AddHours($HoursToCheck)
+if ($HoursToCheck -lt 0) { 
+    $hoursago = (Get-Date).AddHours($HoursToCheck) 
+    $hrdirection = "after";
+} else { 
+    $hoursago = (Get-Date).AddHours(-$HoursToCheck)
+    $hrdirection = "before";
+}
 
 $msghid = if ($CheckHidden -eq 'Y') { "including hidden files" } else { "excluding hidden files" }
 $maxmsg = if ($CheckForSizeMax -eq '-1') { "no maximum size" } else { "maximum size $CheckForSizeMax bytes" }
@@ -945,7 +990,7 @@ $msgext = if ($CheckFor -eq 'EXT') { "Extension .$CheckForExt" } else { "" }
 
 Write-Host "`n[INFO] Scanning using values..." -ForegroundColor Green
 if ($WhichDrive -eq 'ALL') { Write-Host " - Drives: $Drives" } else { Write-Host " - Drives:" $WhichDrive}
-Write-Host " - Look for files modified after: $hoursago"
+Write-Host " - Look for files modified $hrdirection $hoursago"
 Write-Host " - File types: $CheckFor" $msgext
 Write-Host " - Hidden files: $msghid"
 Write-Host " - File size between: $CheckForSizeMin bytes and $maxmsg"
@@ -954,7 +999,7 @@ Write-Host " - Filter: $msgflt"
 if ($ShowHighlights -eq 'Y') {
     Write-Host "`n[INFO] Highlighting enabled..." -ForegroundColor Green
     Write-Host " - Extensions highlighted: $ExtsToHilight"
-    Write-Host " - Files modified after $hoursago will be reported" $msgchi
+    Write-Host " - Files modified $hrdirection $hoursago will be reported" $msgchi
     Write-Host " - meta.json files for each highlighted file:" $metaCt
 }
 
@@ -967,10 +1012,10 @@ $TempUFAll = New-TemporaryFile
 if ( $WhichDrive -ne 'ALL') { $drivestoscan = @($WhichDrive + ":") } else { $drivestoscan = $Drives }
 
 # DBGNOTE: use this instead of Invoke-DriveScan to scan of just one drive (assumes ALL drives not specified). It does not run in seperarte tread, used to debug doScanFor so break points can be used
-#Invoke-SingleDriveScan -WhichDrive $WhichDrive -OutputFile $OutputFile -hoursago $hoursago -FilterApp $FilterApp -CheckFor $CheckFor -CheckForExt $CheckForExt -TempUFAll $TempUFAll -CheckForSizeMin $CheckForSizeMin -CheckForSizeMax $CheckForSizeMax -CheckHidden $CheckHidden
+Invoke-SingleDriveScan -WhichDrive $WhichDrive -OutputFile $OutputFile -hourdirection $hrdirection -hoursago $hoursago -FilterApp $FilterApp -CheckFor $CheckFor -CheckForExt $CheckForExt -TempUFAll $TempUFAll -CheckForSizeMin $CheckForSizeMin -CheckForSizeMax $CheckForSizeMax -CheckHidden $CheckHidden
 
 # Do the scan and get the results with multiple threads to improve time taken
-Invoke-DriveScan -Drives $drivestoscan -OutputFile $OutputFile -hoursago $hoursago -FilterApp $FilterApp -CheckFor $CheckFor -CheckForExt $CheckForExt -TempUFAll $TempUFAll -CheckForSizeMin $CheckForSizeMin -CheckForSizeMax $CheckForSizeMax -CheckHidden $CheckHidden
+# Invoke-DriveScan -Drives $drivestoscan -OutputFile $OutputFile -hourdirection $hrdirection -hoursago $hoursago -FilterApp $FilterApp -CheckFor $CheckFor -CheckForExt $CheckForExt -TempUFAll $TempUFAll -CheckForSizeMin $CheckForSizeMin -CheckForSizeMax $CheckForSizeMax -CheckHidden $CheckHidden
 
 # add a summary of directory counts to the output
 if (Test-Path $OutputFile) {
@@ -989,7 +1034,7 @@ if ($copytodw -ieq 'Y' ) {
 }
 
 # Highlight key file types which changed and copy them if requested
-$fndirsep = "--"
+$fndirsep = "-"
 if ( $ShowHighlights -ieq 'Y' ) { 
     findfilestohighlight -outfile $OutputFile -unfall $TempUFAll -copytodw $CopyHighlights -copyrpterr $CopyReportErrors -resfolder $resfldpath -fnsep $fndirsep -CopyMetaInfo $CopyMetaInfo
 }
