@@ -34,6 +34,7 @@
 # TODO
 # BUG: Filter when specified not working for some reason. 
 # BUG: fix hang in powershell 7.x
+# FRM: Add a debug switch to make use of single threed scan and additional output
 # FMR: allow different filter options (None, Light, Full, custom) - consider external file of dirs to filter as input
 # FMR: move extension lists into function near buildfilters
 # FMR: allow a directory to be scanned rather than just a drive
