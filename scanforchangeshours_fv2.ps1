@@ -8,8 +8,9 @@
 #   Looking for posisble autosave/temp files after program crash to recover them
 #   Understanding what changed after an app install
 #
-# Allows options to specify the number of hours to look back as negative number, 
-# Can just look groups of types of foles, for example, images or excutables, etc
+# Allows options to specify the number of hours as a negative number to look for files newer than specified number
+#   or positive to look for files older than specified hours
+# Can just look groups of types of files, for example, images or excutables, etc
 # Can filter out some directions which likely not of interest.
 # Can just scan one specific drive
 # Can highlight changes to key files types (not affected by any filters applied)
@@ -23,16 +24,22 @@
 # or from within VScode
 # 
 # Only tested in powershell 5.1.26100.4652
-# took possibly 40 hours to get right - the joys of powershell, considering if win32 c/c++ would have been better
-# vibe coding only 10% helpfully but also a timewaster with bad code and red-herrings, poor logic understanding
-# using multiple threading add a lot of complications and restrictions
+#
+# It took possibly 60 hours to get right - the joys of powershell, considering if win32 c/c++ would have been better
+# vibe coding only 10% helpfully but also a time waster due to bad code, red-herrings, poor logic understanding, contradictions, missing depth in response, do X when it needs to be do X but this does not work in case Z.
+# using multiple threading add a lot of complications and restrictions when debugging
+# powershell behaves differently when debugging verses run directly, for example how it initialises varables affecting logic
+# powershell handling of text, and parameters is complex and hard to debug
 
 # TODO
-# allow different filter options (None, Light, Full)
-# move extension lists into function near buildfilters
-# allow a directory to be scanned rather than just a drive
-# add functional tests (lol)
-# fix hang in powershell 7.x
+# BUG: Filter when specified not working for some reason. 
+# BUG: fix hang in powershell 7.x
+# FMR: allow different filter options (None, Light, Full, custom) - consider external file of dirs to filter as input
+# FMR: move extension lists into function near buildfilters
+# FMR: allow a directory to be scanned rather than just a drive
+# FMR: add in a bultin canary test to ensure finding files and working
+# FMR: consider adding result analysis tools
+# FMR: add functional tests
 
 param (
     [string]$ModDefault,        # Y means the below changes the default rather than passes the value, default is N
