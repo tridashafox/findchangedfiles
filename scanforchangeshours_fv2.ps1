@@ -34,6 +34,7 @@
 # TODO
 # BUG: Filter not working as expected due to the fact that the filter is not applied to highlited files (as designed)
 # BUG: fix hang in powershell 7.x
+# FRM: use checkfordebugger to see if it is running if so, switch to single threaded or give option
 # FRM: Add a debug switch to make use of single threed scan and additional output
 # FMR: allow different filter options (None, Light, Full, custom) - consider external file of dirs to filter as input
 # FMR: move extension lists into function near buildfilters
@@ -67,6 +68,16 @@ function clearpressedkeys() {
 }
 
 ########################################################################
+# check if running under debugger, returns string "none" if no debugger
+#
+function checkfordebugger() {
+    $isdebugger = "none"
+    if ($env:TERM_PROGRAM -eq 'vscode') { $isdebugger = "Running in VS Code integrated console" } 
+    elseif ($PSDebugContext) { $isdebugger = "Running in powershell debugger" } 
+    return $isdebugger
+}
+
+########################################################################
 # reports on on enviroment specifics for debugging
 #
 function Show-EnvironmentCheck {
@@ -86,6 +97,7 @@ function Show-EnvironmentCheck {
     Write-Host "TEMP:                     $env:TEMP"
     Write-Host "TMP:                      $env:TMP"
     Write-Host "Temp Path (System API):   $([System.IO.Path]::GetTempPath())"
+    Write-Host "Debugger present:         $(checkfordebugger)"
     Write-Host "===============================`n"
 }
 
@@ -180,10 +192,11 @@ function getpathash {
     $hashBytes = [System.Text.Encoding]::UTF8.GetBytes($name)
     $hash = 0
     foreach ($b in $hashBytes) { $hash = ($hash * 31) + $b }
-    
-    return "{0:D2}{1}" -f $depth, ($hash % 1000000).ToString('D6')
-}
 
+    # Cast to int before formatting
+    $suffix = ([int]($hash % 1000000)).ToString('D6')
+    return "{0:D2}{1}" -f $depth, $suffix
+}
 
 ########################################################################
 # handle Y/N questions
@@ -987,8 +1000,8 @@ if ($ShowHighlights -ieq 'Y') {
 $TransLog = New-TemporaryFile
 Start-Transcript -Path $TransLog -Append | Out-Null
 
-# FOR DEBUGGING show details of the enviroment
-# Show-EnvironmentCheck 
+# FOR DEBUGGING show details of the enviroment if running under a debugger
+if (checkfordebugger -neq "none") { Show-EnvironmentCheck }
 
 # Do Clean
 if ( $cleantempfiles -ieq 'Y' ) { 
@@ -1037,8 +1050,9 @@ $TempUFAll = New-TemporaryFile
 # Get drives to scan
 if ( $WhichDrive -ne 'ALL') { $drivestoscan = @($WhichDrive + ":") } else { $drivestoscan = $Drives }
 
+# TODO: use checkfordebugger to see if it is running if so, switch to single threaded or give option
 # DBGNOTE: use this instead of Invoke-DriveScan to scan of just one drive (assumes ALL drives not specified). It does not run in seperarte tread, used to debug doScanFor so break points can be used
-Invoke-SingleDriveScan -WhichDrive $WhichDrive -OutputFile $OutputFile -hourdirection $hrdirection -hoursago $hoursago -FilterApp $FilterApp -CheckFor $CheckFor -CheckForExt $CheckForExt -TempUFAll $TempUFAll -CheckForSizeMin $CheckForSizeMin -CheckForSizeMax $CheckForSizeMax -CheckHidden $CheckHidden
+# Invoke-SingleDriveScan -WhichDrive $WhichDrive -OutputFile $OutputFile -hourdirection $hrdirection -hoursago $hoursago -FilterApp $FilterApp -CheckFor $CheckFor -CheckForExt $CheckForExt -TempUFAll $TempUFAll -CheckForSizeMin $CheckForSizeMin -CheckForSizeMax $CheckForSizeMax -CheckHidden $CheckHidden
 
 # Do the scan and get the results with multiple threads to improve time taken
 Invoke-DriveScan -Drives $drivestoscan -OutputFile $OutputFile -hourdirection $hrdirection -hoursago $hoursago -FilterApp $FilterApp -CheckFor $CheckFor -CheckForExt $CheckForExt -TempUFAll $TempUFAll -CheckForSizeMin $CheckForSizeMin -CheckForSizeMax $CheckForSizeMax -CheckHidden $CheckHidden
