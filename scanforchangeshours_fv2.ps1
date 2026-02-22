@@ -32,7 +32,7 @@
 # powershell handling of text, and parameters is complex and hard to debug
 
 # TODO
-# BUG: Filter when specified not working for some reason. 
+# BUG: Filter not working as expected due to the fact that the filter is not applied to highlited files (as designed)
 # BUG: fix hang in powershell 7.x
 # FRM: Add a debug switch to make use of single threed scan and additional output
 # FMR: allow different filter options (None, Light, Full, custom) - consider external file of dirs to filter as input
@@ -403,6 +403,10 @@ function doScanfor {
 ########################################################################
 # looks for files with specific extenions in unfiltered full list (unfall)  
 # and adds results to passed output file (outfile)
+#
+# TODO: This is an annoying design, highlited files dont have a filter applied to them 
+# as they are ment to be important to highlight independent of the filter, but
+# if you have a lot of these there is no way to trim them down.
 #
 function findfilestohighlight {
     param (
@@ -1034,7 +1038,7 @@ $TempUFAll = New-TemporaryFile
 if ( $WhichDrive -ne 'ALL') { $drivestoscan = @($WhichDrive + ":") } else { $drivestoscan = $Drives }
 
 # DBGNOTE: use this instead of Invoke-DriveScan to scan of just one drive (assumes ALL drives not specified). It does not run in seperarte tread, used to debug doScanFor so break points can be used
-# Invoke-SingleDriveScan -WhichDrive $WhichDrive -OutputFile $OutputFile -hourdirection $hrdirection -hoursago $hoursago -FilterApp $FilterApp -CheckFor $CheckFor -CheckForExt $CheckForExt -TempUFAll $TempUFAll -CheckForSizeMin $CheckForSizeMin -CheckForSizeMax $CheckForSizeMax -CheckHidden $CheckHidden
+Invoke-SingleDriveScan -WhichDrive $WhichDrive -OutputFile $OutputFile -hourdirection $hrdirection -hoursago $hoursago -FilterApp $FilterApp -CheckFor $CheckFor -CheckForExt $CheckForExt -TempUFAll $TempUFAll -CheckForSizeMin $CheckForSizeMin -CheckForSizeMax $CheckForSizeMax -CheckHidden $CheckHidden
 
 # Do the scan and get the results with multiple threads to improve time taken
 Invoke-DriveScan -Drives $drivestoscan -OutputFile $OutputFile -hourdirection $hrdirection -hoursago $hoursago -FilterApp $FilterApp -CheckFor $CheckFor -CheckForExt $CheckForExt -TempUFAll $TempUFAll -CheckForSizeMin $CheckForSizeMin -CheckForSizeMax $CheckForSizeMax -CheckHidden $CheckHidden
