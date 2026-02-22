@@ -892,6 +892,11 @@ function Invoke-DriveScan {
 # Main 
 #
 
+# FOR DEBUGGING show details of the enviroment if running under a debugger
+# POWERSHELL oddies, even though checkfordebugger returns a string, the if might not enforce the string type, causing the
+# condition not match the string "none" when "none" is returned. So need the $() around the return from checkfordebugger
+if ($(checkfordebugger) -ne "none") { Show-EnvironmentCheck }
+
 [console]::bufferwidth = 30000
 $dwdir = (New-Object -ComObject Shell.Application).NameSpace('shell:Downloads').Self.Path
 $Drives = Get-CimInstance -ClassName Win32_LogicalDisk -Filter "DriveType=3" | ForEach-Object { "$($_.DeviceID)" }
@@ -999,9 +1004,6 @@ if ($ShowHighlights -ieq 'Y') {
 # Start a transaction log so it can be included in the output file for later reference
 $TransLog = New-TemporaryFile
 Start-Transcript -Path $TransLog -Append | Out-Null
-
-# FOR DEBUGGING show details of the enviroment if running under a debugger
-if (checkfordebugger -neq "none") { Show-EnvironmentCheck }
 
 # Do Clean
 if ( $cleantempfiles -ieq 'Y' ) { 
