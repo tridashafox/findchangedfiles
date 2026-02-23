@@ -28,6 +28,7 @@
 #
 
 # TODO
+# update readme.md
 # BUG: fix hang in powershell 7.x
 # FRM: change how directory counts are created, so they depth is set to 3 or something, not the full path
 # FRM: use checkfordebugger to see if it is running if so, switch to single threaded or give option
