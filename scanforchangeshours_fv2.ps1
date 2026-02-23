@@ -8,57 +8,54 @@
 #   Looking for posisble autosave/temp files after program crash to recover them
 #   Understanding what changed after an app install
 #
-# Allows options to specify the number of hours as a negative number to look for files newer than specified number
-#   or positive to look for files older than specified hours
-# Can just look groups of types of files, for example, images or excutables, etc
-# Can filter out some directions which likely not of interest.
-# Can just scan one specific drive
-# Can highlight changes to key files types (not affected by any filters applied)
-# highlighting key files is a sperate processing but uses the same scan output nad hours to look for
+# Allows option to specify a number of hours from now to look for changed files (negative number). E.g. -3 means look for any changed files in the last three hours.
+# Allows option to specify the number of hours after now to look for changed files (positive number). E.g. 3 means look for any changed up to three hours ago.
+# Number of hours can have a decimal point, e.g. -0.1 means look for files change in the last 6 minuntes.
+# Can just look for specific groups of file types, executibles EXE, images IMG or a specific extension type EXT.
+# Can just scan one specific drive or all drives
+# Can highlight changes to key files types which are important to look for changes (EXE, IMG)
+# Can use a scan filter to filter out directories should not be reported on
+# Can use a highlight copy filter to filter out directories from which highlighted files should not be copied
+# Note highlighting key files is a sperate processing but uses the same hours value
+# It produces a results file that is stored in a directory in user's download location
+# Filter input files are simple text files with a directory specified on each line
+# Note that this output directory, by default, will be included in later scans so delete when not required
 #
-# It produces a results file that is stored in a directory in users download location
-# Note that  this output dir will be included in later scans so delete when not required
-#
-# After win11H2 update powershell scripts won't run unless you run it in a powershell terminal using command
-# powershell -ExecutionPolicy ByPass -File .\scanforchangeshours_fv2.ps1
+# Run it in a powershell terminal using command: powershell -ExecutionPolicy ByPass -File .\scanforchangeshours_fv2.ps1
 # or from within VScode
 # 
 # Only tested in powershell 5.1.26100.4652
 #
-# It took possibly 60 hours to get right - the joys of powershell, considering if win32 c/c++ would have been better
-# vibe coding only 10% helpfully but also a time waster due to bad code, red-herrings, poor logic understanding, contradictions, missing depth in response, do X when it needs to be do X but this does not work in case Z.
-# using multiple threading add a lot of complications and restrictions when debugging
-# powershell behaves differently when debugging verses run directly, for example how it initialises varables affecting logic
-# powershell handling of text, and parameters is complex and hard to debug
 
 # TODO
-# BUG: Filter not working as expected due to the fact that the filter is not applied to highlited files (as designed)
 # BUG: fix hang in powershell 7.x
 # FRM: change how directory counts are created, so they depth is set to 3 or something, not the full path
 # FRM: use checkfordebugger to see if it is running if so, switch to single threaded or give option
 # FRM: Add a debug switch to make use of single threed scan and additional output
-# FMR: allow different filter options (None, Light, Full, custom) - consider external file of dirs to filter as input
 # FMR: move extension lists into function near buildfilters
 # FMR: allow a directory to be scanned rather than just a drive
-# FMR: add in a bultin canary test to ensure finding files and working
+# FMR: add in a built in canary test to ensure finding files and working
 # FMR: consider adding result analysis tools
 # FMR: add functional tests
 
 param (
-    [string]$ModDefault,        # Y means the below changes the default rather than passes the value, default is N
-    [string]$CleanTempFiles,    # Y if want to run windows cleanmgr before running scan, default is N
-    [double]$HoursToCheck,      # Number of hours to look back for changes, default is -3, note this can have a decimal point e.g. -0.5 (last half-hour). If postive looks for changed files before specified hours.
-    [string]$WhichDrive,        # Which drive to scan, or all drives, default is ALL
-    [string]$CheckFor,          # Which types of files to check for, can be  is ALL, IMG (anything at is an Image), EXT (askes for an CheckForExt), EXE (anything that executes), default is ALL
-    [string]$CheckForExt,       # A specific extension to scan for (don't include the '.' before the extension), default PNG. Ignored unless CheckFor is EXT
-    [string]$CheckHidden,       # Y if want to try to scan hidden files, default is N
-    [int]$CheckForSizeMin,      # Include files above this min size, default is 0 (all files)
-    [int]$CheckForSizeMax,      # Include files blow this max size, default is -1 (all files)
-    [string]$FilterApp,         # Apply a built in filter to cut down noisey files, default is 'Y' if CheckFor is ALL 
-    [string]$ShowHighlights,    # Look for key file types that changed and list them out, default is 'Y'
-    [string]$CopyHighlights,    # Copy files found by ShowHighlights to a temp directory in downloads, default is 'N' if CheckFor is ALL
-    [string]$CopyMetaInfo,      # Create a json file with info about for each file found by ShowHighlights, default is 'N' if CheckFor is ALL
-    [string]$CopyReportErrors   # Report errors during the ShowHighlights operation into the results file, default is 'N'
+    [string]$ModDefault,           # Y means the below changes the default rather than passes the value, default is N
+    [string]$CleanTempFiles,       # Y if want to run windows cleanmgr before running scan, default is N
+    [double]$HoursToCheck,         # Number of hours to look back for changes, default is -3, note this can have a decimal point e.g. -0.5 (last half-hour). If postive looks for changed files before specified hours.
+    [string]$WhichDrive,           # Which drive to scan, or all drives, default is ALL
+    [string]$CheckFor,             # Which types of files to check for, can be  is ALL, IMG (anything at is an Image), EXT (askes for an CheckForExt), EXE (anything that executes), default is ALL
+    [string]$CheckForExt,          # A specific extension to scan for (don't include the '.' before the extension), default PNG. Ignored unless CheckFor is EXT
+    [string]$CheckHidden,          # Y if want to try to scan hidden files, default is 'N'
+    [int]$CheckForSizeMin,         # Include files above this min size, default is 0 (all files)
+    [int]$CheckForSizeMax,         # Include files blow this max size, default is -1 (all files)
+    [string]$FilterApp,            # Y means apply filter to the scan to not report on specific directories.
+    [string]$ScanFilterfn,         # Name of a file which contains a list of directories which should not be checked for changes if FilterApp is 'Y'
+    [string]$ShowHighlights,       # Look for key file types that changed and list them out, default is 'Y'
+    [string]$CopyHighlights,       # Copy files found by ShowHighlights to a temp directory in downloads, default is 'N'
+    [string]$CopyHLFilter,         # Y means apply filter to not copy highlighted files from specific directories.
+    [string]$CopyHLFilterfn,       # Name of a file which contains a list of directories from which highlighted files should not be copied if CopyHLFilter is 'Y'
+    [string]$CopyMetaInfo,         # Create a json file with info about for each file found by ShowHighlights, default is 'N'
+    [string]$CopyReportErrors      # Report errors during the ShowHighlights operation into the results file, default is 'N'
 )
 
 ########################################################################
@@ -66,6 +63,15 @@ param (
 #
 function clearpressedkeys() {
     while ([console]::KeyAvailable) { [console]::ReadKey($true) | Out-Null }
+}
+
+########################################################################
+# display prompt before exiting, this never returns
+#
+function waitbeforeexit() {
+    clearpressedkeys
+    read-host "Press ENTER to continue"
+    exit 1
 }
 
 ########################################################################
@@ -204,8 +210,8 @@ function getpathash {
 #
 function getYNinput {
     param (
-        $ModDefault,    # don't typpe as string, we need to know if it is $null, if it's typed it will end up ""
-        $InitValue,     # don't typpe as string
+        $ModDefault,    # don't type as string, we need to know if it is $null, if it's typed it will end up ""
+        $InitValue,     # don't type as string
         [string]$Name,
         [string]$Prompt,
         [string]$Default = 'N'
@@ -224,16 +230,14 @@ function getYNinput {
     } elseif ($InitValue -eq 'Y' -or $InitValue -eq 'N') { return $InitValue }
 
     Write-Host "Invalid option for $Name. Must be Y or N" -ForegroundColor Red 
-    exit 1
+    waitbeforeexit
 }
 
 ########################################################################
 # Parse results file and display a summary of file counts in directories
 # NOTE will fail if any of the formating of the output is changed
-# Usage examples:
-# Get-DirectoryFileCounts -Filename "your_file.txt"
 #
-function Get-DirectoryFileCounts {
+function gitdirfilecounts {
     param(
         [Parameter(Mandatory=$true)]
         [string]$Filename
@@ -418,10 +422,6 @@ function doScanfor {
 # looks for files with specific extenions in unfiltered full list (unfall)  
 # and adds results to passed output file (outfile)
 #
-# TODO: This is an annoying design, highlited files dont have a filter applied to them 
-# as they are ment to be important to highlight independent of the filter, but
-# if you have a lot of these there is no way to trim them down.
-#
 function findfilestohighlight {
     param (
         [string]$outfile,
@@ -430,8 +430,14 @@ function findfilestohighlight {
         [string]$copyrpterr,
         [string]$resfolder,
         [string]$fnsep,
-        [string]$CopyMetaInfo
+        [string]$CopyMetaInfo,
+        [string]$CopyHLFilter,
+        [string]$CopyHLFilterfn
         )
+
+
+    $filtercopyhlpat = @()
+    if ($CopyHLFilter -ieq 'Y') { $filtercopyhlpat = buildfilterarray($CopyHLFilterfn) }
 
     $filteredfiles = Get-Content -Path $unfall | Where-Object { $ExtsToHilight -contains [System.IO.Path]::GetExtension($_.Trim().Split()[-1]) }
     $filteredfiles = $filteredfiles | Where-Object { $_ -notlike "*   0*" } # remove zero byte files
@@ -506,14 +512,6 @@ function findfilestohighlight {
                             $baseFileName = $partname.BaseName
                             $dirpathonly = $partname.Directory.FullName
                             $pathhash = getpathash $dirpathonly
-                            
-                            <# 
-                            # Old method converts th path into a name c--dir1--dir2--file1.txt
-                            $relativePath = $fullPathStr.Substring(3)  # Strip drive letter like C:\
-                            $components = $relativePath -split '\\'
-                            $safePathName = ($components -join $fnsep)
-                            $baseFileName = $fullPathStr[0] + $fnsep + $safePathName
-                            #>
                         }
                         catch {
                             $countercpErr++
@@ -528,9 +526,8 @@ function findfilestohighlight {
                             $counter++
                             $shouldSkip = $false
                             
-                            # Debug or make a param as filter does not work - exclude some dirs from highlight copy if specified 
-                            # $excludePathsDdg = @("C:\dir\") 
-                            # foreach ($excludeDdg in $excludePathsDdg) { if ($filename.Length -ge $excludeDdg.Length -and $filename.Substring(0, $excludeDdg.Length) -ieq $excludeDdg) { $shouldSkip = $true; $skippedcnt++; break } }
+                            # exclude items from copy in match entry in filter
+                            foreach ($excludeDdg in $filtercopyhlpat) { if ($filename.Length -ge $excludeDdg.Length -and $filename.Substring(0, $excludeDdg.Length) -ieq $excludeDdg) { $shouldSkip = $true; $skippedcnt++; break } }
 
                             if (-not $shouldSkip) 
                             {
@@ -597,14 +594,14 @@ function findfilestohighlight {
             if ($counter -gt $counterstart) { 
                 $highlitecopyinfotext = $nnewline + $($counter - $counterstart) + " highlighted files were copied to " + $tempFolderPath 
                 Add-Content -Path $outfile -Value $highlitecopyinfotext -Encoding UTF8
-                # $nnewline = ''
+                $nnewline = ''
             }
             if ($countercpErr -gt 0) { 
                 $highlitecopyinfotext =  $nnewline + $countercpErr + " highlighted files could not be copied to " + $tempFolderPath
                 Add-Content -Path $outfile -Value $highlitecopyinfotext -Encoding UTF8
             }
             if ($skippedcnt -gt 0) {
-                $highlitecopyinfotext =  $nnewline + $skippedcnt + " highlighted files where skipped in copy operation " + $tempFolderPath
+                $highlitecopyinfotext =  $nnewline + $skippedcnt + " highlighted files were skipped in copy operation  to " + $tempFolderPath
                 Add-Content -Path $outfile -Value $highlitecopyinfotext -Encoding UTF8
             }
         }
@@ -644,101 +641,68 @@ function postprocess {
 }
 
 ########################################################################
-# create a filter to be used to filter out noisy files not of interest
+# create a filter pattern string to be used to filter out noisy files not of interest
 #
 function buildfilterpatern { 
-     # create a filter for common noisy dirs with changes not of interest. Note even with filter highlited files will intentionaly show up
-    $patsp = "|" 
-    $winddir = $env:WINDIR.Replace("\", "\\") + "\\"
-    $sysmdrv = $winddir[0] + ":"
-    $homedir = $env:USERPROFILE.Replace("\", "\\")
-    $tempRot = $(Split-Path -Path $env:TEMP -Parent).Replace("\", "\\")
-    $tempusr = $env:TMP.Replace("\", "\\")
-    $prgfles = $env:ProgramFiles.Replace("\", "\\")
-    $prgfl86 = ([System.Environment]::GetFolderPath("ProgramFilesX86").Replace("\", "\\")).Replace("(", "\(").Replace(")", "\)")
-    $pgmdata = [System.Environment]::GetFolderPath("CommonApplicationData").Replace("\", "\\") 
+    param (
+        [string]$ExcludeFilelist
+    )
 
-    # Add others here as required
-    $textfilterpat = `
-        $winddir + $patsp +`
-        $prgfl86 + "\\Steam" + $patsp +`
-        $prgfl86 + "\\Google" + $patsp +`
-        $prgfl86 + "\\Microsoft\\Edge" + $patsp +`
-        $prgfl86 + "\\Epic Games\\" + $patsp +`
-        $prgfl86 + "\\Microsoft OneDrive" + $patsp +`
-        $prgfles + "\\Microsoft Office" + $patsp +`
-        $prgfles + "\\Common Files\\microsoft shared" + $patsp +`
-        $prgfles + "\\Adobe" + $patsp +`
-        $prgfles + "\\Common Files\\Adobe" + $patsp +`
-        $prgfles + "\\Google\\Chrome\\" + $patsp +`
-        $prgfles + "\\NVIDIA" + $patsp +`
-        $pgmdata + "\\Microsoft\\EdgeUpdate" + $patsp +  
-        $pgmdata + "\\Microsoft\\ClickToRun\\" + $patsp +`
-        $pgmdata + "\\Mozilla" + $patsp +`
-        $pgmdata + "\\NVIDIA Corporation" + $patsp +`
-        $pgmdata + "\\regid." + $patsp +`
-        $pgmdata + "\\USOPrivate\\UpdateStore" + $patsp +`
-        $pgmdata + "\\USOShared\\Logs\\System" + $patsp +`
-        $pgmdata + "\\NVIDIA\\" + $patsp +`
-        $pgmdata + "\\Microsoft\\Windows Defender\\" + $patsp +`
-        $pgmdata + "\\Microsoft\\MapData\\" + $patsp +`
-        $pgmdata + "\\Epic\\" + $patsp +`
-        $sysmdrv + "\\Users\\All Users\\Microsoft\\EdgeUpdate" + $patsp +`
-        $sysmdrv + "\\Users\\All Users\\NVIDIA" + $patsp +`
-        $sysmdrv + "\\Users\\All Users\\regid." + $patsp +`
-        $sysmdrv + "\\Users\\All Users\\USO" + $patsp +`
-        $sysmdrv + "\\Users\\All Users\\USOShared\\Logs\\System\\MoUxCoreWorker" + $patsp +`
-        $sysmdrv + "\\Users\\All Users\\Microsoft\\Windows Defender\\" + $patsp +`
-        $sysmdrv + "\\Users\\All Users\\Microsoft Visual Studio\\" + $patsp +`
-        $sysmdrv + "\\Users\\All Users\\Microsoft\\MapData\\" + $patsp +`
-        $sysmdrv + "\\Users\\All Users\\Epic\\" + $patsp +`
-        $homedir + "\\.vscode" + $patsp +`
-        $homedir + "\\AppData\\Local\\ConnectedDevicesPlatform" + $patsp +`
-        $homedir + "\\AppData\\Local\\D3DSCache" + $patsp +`
-        $homedir + "\\AppData\\Local\\Google\\Chrome" + $patsp +`
-        $homedir + "\\AppData\\Local\\Microsoft" + $patsp +`
-        $homedir + "\\AppData\\Local\\Mozilla" + $patsp +`
-        $homedir + "\\AppData\\Local\\npm-cache" + $patsp +`
-        $homedir + "\\AppData\\Local\\NVIDIA" + $patsp +`
-        $homedir + "\\AppData\\Local\\Packages\\Microsoft" + $patsp +`
-        $homedir + "\\AppData\\Local\\Packages\\MicrosoftWindows" + $patsp +`
-        $homedir + "\\AppData\\Local\\Steam" + $patsp +`
-        $tempRot + "\\system\\CreativeCloud" + $patsp +`
-        $tempusr + "\\NGL\\NGLClient_" + $patsp +`
-        $homedir + "\\AppData\\LocalLow\\Microsoft" + $patsp +`
-        $homedir + "\\AppData\\Roaming\\Adobe" + $patsp +`
-        $homedir + "\\AppData\\Roaming\\Code" + $patsp +`
-        $homedir + "\\AppData\\Roaming\\Mozilla\\" + $patsp +`
-        $homedir + "\\AppData\\Roaming\\Microsoft\\Windows\\Recent\\CustomDestinations" + $patsp +`
-        $homedir + "\\AppData\\Local\\Adobe\\OOBE\\" + $patsp +`
-        $homedir + "\\AppData\\Roaming\\com.adobe.dunamis\\" + $patsp +`
-        $homedir + "\\AppData\\Roaming\\Microsoft\\Spelling\\" + $patsp +`
-        $homedir + "\\AppData\\Roaming\\Microsoft\\SystemCertificates\\" + $patsp +`
-        $homedir + "\\AppData\\Roaming\\Microsoft\\VisualStudio" + $patsp +`
-        $tempusr + "\\VSWebView2Cache\\" + $patsp +`
-        $homedir + "\\AppData\\Roaming\\Microsoft\\Windows\\" + $patsp +`
-        $homedir + "\\AppData\\Local\\Adobe\\" + $patsp +`
-        $homedir + "\\AppData\\Local\\Programs\\Microsoft VS Code\\" + $patsp +`
-        $homedir + "\\Saved Games\\" + $patsp
+    $textfilterpat = ""
+    if (-not [string]::IsNullOrEmpty($ExcludeFilelist) -and (Test-Path -Path $ExcludeFilelist -PathType Leaf)) {
+        $patsp = "|" 
+        $textfilterpat = (
+            Get-Content -Path $ExcludeFilelist | 
+                Where-Object   { $_.Trim() -ne ''    } |   # Skip empty lines
+                ForEach-Object { $_.Trim()           } |   # Remove leading/trailing spaces
+                ForEach-Object { [regex]::Escape($_) }     # Escape special chars
+        ) -join $patsp
 
-    #  on all drives which need filtering for the same dirs
-    $drives = Get-CimInstance -ClassName Win32_LogicalDisk -Filter "DriveType=3" | ForEach-Object { "$($_.DeviceID)" }
-    foreach ($drive in $drives) {
-        $textfilterpat +=  $drive[0] + ":\\SteamLibrary\\steamapps\\workshop" + $patsp
-        $textfilterpat +=  $drive[0] + ":\\SteamLibrary\\steamapps\\common" + $patsp
-        $textfilterpat += "  0 " + $drive[0]+ ":\\"+ $patsp # filter out zero lenght files, special case
+        if ($textfilterpat -eq $patsp) {  $textfilterpat = ""}
+        elseif ($textfilterpat.Count -gt 0 -and $textfilterpat[-1] -ne $patsp) { $textfilterpat +=  $patsp } # add missing end of pat pipe
     }
-    
-    # For DEBUGGING
+
+    if ($textfilterpat.Count -eq 0) { Write-Host "[Warning] Filter file '$ExcludeFilelist' does not exist or contains no entries." -ForegroundColor Yellow}
+
     <#
+    # For DEBUGGING & - creates a scoped block
     &{
         # dump the filter txt to dowloads dir
         $dwdir = (New-Object -ComObject Shell.Application).NameSpace('shell:Downloads').Self.Path
         $dboutfn = $dwdir + "\sfc_debug_filter.txt"
         $textfilterpat | Add-Content -Path $dboutfn
-    } #>
-
+    } 
+    #>
+    
     return $textfilterpat
+}
+
+########################################################################
+# create a filter string array of directory paths from passed file
+#
+function buildfilterarray { 
+    param (
+        [string]$ExcludeFilelist
+    )
+
+    $textfilterarr = @()
+    if (-not [string]::IsNullOrEmpty($ExcludeFilelist) -and (Test-Path -Path $ExcludeFilelist -PathType Leaf)) {
+        $textfilterarr = Get-Content -Path $ExcludeFilelist
+    }
+
+    if ($textfilterarr.Count -eq 0) { Write-Host "[Warning] Filter file '$ExcludeFilelist' does not exist or contains no entries." -ForegroundColor Yellow}
+
+    <#
+    # For DEBUGGING & - creates a scoped block
+    &{
+        # dump the filter txt to dowloads dir
+        $dwdir = (New-Object -ComObject Shell.Application).NameSpace('shell:Downloads').Self.Path
+        $dboutfn = $dwdir + "\sfc_debug_filter.txt"
+        $textfilterpat | Add-Content -Path $dboutfn
+    } 
+    #>
+    
+    return $textfilterarr
 }
 
 ########################################################################
@@ -757,16 +721,17 @@ function Invoke-SingleDriveScan {
         $CheckForSizeMin,
         $CheckForSizeMax,
         $CheckHidden,
+        $ScanFilterfn, 
         [string]$OutputFile
     )
 
     # Scans one drive at a time so drive must be a single letter and not ALL
-    if ($WhichDrive.Length -gt 1) { Write-Host "[Error] Invalid drive letter '$WhichDrive' passed to function Invoke-SingleDriveScan.`n" -ForegroundColor Red; exit 1}
+    if ($WhichDrive.Length -gt 1) { Write-Host "[Error] Invalid drive letter '$WhichDrive' passed to function Invoke-SingleDriveScan.`n" -ForegroundColor Red; waitbeforeexit}
 
     $TempFileX = New-TemporaryFile
     $temploc = $WhichDrive + ":\"
     $filterpatstr = ''
-    if ($FilterApp -eq 'Y') { $filterpatstr = buildfilterpatern }
+    if ($FilterApp -eq 'Y') { $filterpatstr = buildfilterpatern($ScanFilterfn) }
 
     $result = doScanfor -drive $temploc -outfile $TempFileX -hrdir $hourdirection -hago $hoursago -dofilter $FilterApp -filterpatstr $filterpatstr -exttochk $CheckFor -exttochkact $CheckForExt -unfall $TempUFAll -minSize $CheckForSizeMin -maxSize $CheckForSizeMax -checkforcehidden $CheckHidden -brootonly $false
     showscanduration -Result $result
@@ -798,6 +763,7 @@ function Invoke-DriveScan {
         $CheckForSizeMin,
         $CheckForSizeMax,
         $CheckHidden,
+        $ScanFilterfn, 
         [string]$OutputFile
     )
 
@@ -819,7 +785,7 @@ function Invoke-DriveScan {
         $tempRootUFAll = New-TemporaryFile 
         $TempFilesMapUFAll[$driveLetter] += $tempRootUFAll 
         $filterpatstr = ''
-        if ($FilterApp -eq 'Y') { $filterpatstr = buildfilterpatern }
+        if ($FilterApp -eq 'Y') { $filterpatstr = buildfilterpatern($ScanFilterfn) }
 
         # create drive root level job
         $jobs += Start-Job -ScriptBlock ${function:doScanfor} -ArgumentList (Join-Path $drive "\*"), $tempRoot, $hourdirection, $hoursago, $FilterApp, $filterpatstr, `
@@ -935,7 +901,7 @@ if ($HoursToCheck -eq 0 -or $ModDefault) {
     }
 } 
 
-if ($HoursToCheck -eq 0) { Write-Host "Invalid HoursToCheck. Must not be zero." -ForegroundColor Red; exit 1 }
+if ($HoursToCheck -eq 0) { Write-Host "Invalid HoursToCheck. Must not be zero." -ForegroundColor Red; waitbeforeexit}
 if ($HoursToCheck -ge 0) { Write-Host "Warning: Positive number entered. Scan will look for files older than specified hours." -ForegroundColor Yellow }
 
 # Options: What drives to scan 
@@ -948,7 +914,7 @@ if (!$WhichDrive -or $ModDefault) {
         if ($WhichDrive -ieq '') { $WhichDrive = $defval }
         if (-not ($validDrives -contains $WhichDrive)) { Write-Host "Invalid drive requested. Valid drives are $validDrives." -ForegroundColor Yellow } else { break }
     }
-} elseif (-not ($validDrives -contains $WhichDrive)) { Write-Host "Invalid WhichDrive value. Valid drives are $validDrives." -ForegroundColor Red; exit 1 }
+} elseif (-not ($validDrives -contains $WhichDrive)) { Write-Host "Invalid WhichDrive value. Valid drives are $validDrives." -ForegroundColor Red; waitbeforeexit }
 
 # Options: What file types to look for
 $validCftypes = @('ALL', 'IMG', 'EXT', 'EXE')
@@ -959,7 +925,7 @@ if (!$CheckFor -or $ModDefault) {
         if ($CheckFor -ieq '') { $CheckFor = $defval}
         if ($CheckFor -notin $validCftypes) { Write-Host "Invalid option." -ForegroundColor Red } else { break }
     }
-} elseif ($CheckFor -notin $validCftypes) { Write-Host "Invalid CheckFor option. Must be one of $validCftypes." -ForegroundColor Red; exit 1 }
+} elseif ($CheckFor -notin $validCftypes) { Write-Host "Invalid CheckFor option. Must be one of $validCftypes." -ForegroundColor Red; waitbeforeexit }
 
 if ($CheckFor -eq 'EXT') {
     if (!$CheckForExt -or $ModDefault) {
@@ -985,9 +951,15 @@ if (-not $PSBoundParameters.ContainsKey('CheckForSizeMax') -or $ModDefault) {
     if ( $CheckForSizeMax -ieq '' ) { $CheckForSizeMax = '-1'}
 }
 
-# Options: Apply Filter - different default dependng if all drives scan is requested
-if ($CheckFor -ne 'ALL') { $inyndef =  'N' } else { $inyndef =  'Y' }
-$FilterApp = getYNinput $ModDefault $FilterApp "FilterApp" "Apply filter?" $inyndef 
+# Options: Apply Filter to directories to scan
+$FilterApp = getYNinput $ModDefault $FilterApp "FilterApp" "Apply filter to directories to scan?" $inyndef
+if ($FilterApp -ieq 'Y' -and $ScanFilterfn.Length -eq 0) {
+    while ($true) {
+        $ScanFilterfn = $(Read-Host "File containing list of directories to omit from scan?").ToLower()
+        if ([string]::IsNullOrEmpty($ScanFilterfn)) { Write-Host "No file provided." -ForegroundColor Red; continue }
+        if (Test-Path -Path $ScanFilterfn -PathType Leaf) { break } else { Write-Host "File not found." -ForegroundColor Red; continue  }
+    }
+}
 
 # Options: Highlighted files - different default depending on file type requested
 $ShowHighlights = getYNinput $ModDefault $ShowHighlights "ShowHighlights" "Highlight key changed file types at end?" 'Y'
@@ -1000,6 +972,18 @@ if ($ShowHighlights -ieq 'Y') {
     $CopyHighlights = 'N'
     $CopyMetaInfo = 'N' 
     $CopyReportErrors = 'N'
+}
+
+# Options: Apply filter to highlight copy 
+if ($CopyHighlights -ieq 'Y') {
+    $CopyHLFilter = getYNinput $ModDefault $CopyHLFilter "CopyHLFilter" "Apply filter to copying of highlighted files?" 
+}
+if ($CopyHLFilter -ieq 'Y' -and $CopyHighlights -ieq 'Y' -and $CopyHLFilterfn.Length -eq 0) {
+    while ($true) {
+        $CopyHLFilterfn = $(Read-Host "File containing directories to exclude from copying highlighted files?").ToLower()
+        if ([string]::IsNullOrEmpty($CopyHLFilterfn)) { Write-Host "No file provided." -ForegroundColor Red; continue }
+        if (Test-Path -Path $CopyHLFilterfn -PathType Leaf) { break } else { Write-Host "File not found." -ForegroundColor Red; continue  }
+    }
 }
 
 # Start a transaction log so it can be included in the output file for later reference
@@ -1029,6 +1013,7 @@ $msgflt = if ($FilterApp -eq 'Y') { "with filter applied." } else { "with no fil
 $metaCt = if ($CopyMetaInfo -eq 'Y') { "will be created." } else { "will not be created." }
 $msgchi = if ($CopyHighlights -eq 'Y') { "and will be copied to an output directory."} else { "only." }
 $msgext = if ($CheckFor -eq 'EXT') { "Extension .$CheckForExt" } else { "" }
+$msgflc = if ($CopyHLFilter -eq 'Y') { "with filter applied." } else { "with no filter applied." }
 
 Write-Host "`n[INFO] Scanning using values..." -ForegroundColor Green
 if ($WhichDrive -eq 'ALL') { Write-Host " - Drives: $Drives" } else { Write-Host " - Drives:" $WhichDrive}
@@ -1036,7 +1021,10 @@ Write-Host " - Look for files modified $hrdirection $hoursago"
 Write-Host " - File types: $CheckFor" $msgext
 Write-Host " - Hidden files: $msghid"
 Write-Host " - File size between: $CheckForSizeMin bytes and $maxmsg"
-Write-Host " - Filter: $msgflt"
+Write-Host " - Filter scan: $msgflt"
+Write-Host " - Filter copied highlighted files: $msgflc"
+Write-Host " - Scan Filter input file: $ScanFilterfn"
+Write-Host " - Copy highlight filter input file: $CopyHLFilterFn"
 
 if ($ShowHighlights -eq 'Y') {
     Write-Host "`n[INFO] Highlighting enabled..." -ForegroundColor Green
@@ -1055,16 +1043,16 @@ if ( $WhichDrive -ne 'ALL') { $drivestoscan = @($WhichDrive + ":") } else { $dri
 
 # TODO: use checkfordebugger to see if it is running if so, switch to single threaded or give option
 # DBGNOTE: use this instead of Invoke-DriveScan to scan of just one drive (assumes ALL drives not specified). It does not run in seperarte tread, used to debug doScanFor so break points can be used
-# Invoke-SingleDriveScan -WhichDrive $WhichDrive -OutputFile $OutputFile -hourdirection $hrdirection -hoursago $hoursago -FilterApp $FilterApp -CheckFor $CheckFor -CheckForExt $CheckForExt -TempUFAll $TempUFAll -CheckForSizeMin $CheckForSizeMin -CheckForSizeMax $CheckForSizeMax -CheckHidden $CheckHidden
+# Invoke-SingleDriveScan -WhichDrive $WhichDrive -OutputFile $OutputFile -hourdirection $hrdirection -hoursago $hoursago -FilterApp $FilterApp -CheckFor $CheckFor -CheckForExt $CheckForExt -TempUFAll $TempUFAll -CheckForSizeMin $CheckForSizeMin -CheckForSizeMax $CheckForSizeMax -CheckHidden $CheckHidden -ScanFilterfn $ScanFilterfn
 
 # Do the scan and get the results with multiple threads to improve time taken
-Invoke-DriveScan -Drives $drivestoscan -OutputFile $OutputFile -hourdirection $hrdirection -hoursago $hoursago -FilterApp $FilterApp -CheckFor $CheckFor -CheckForExt $CheckForExt -TempUFAll $TempUFAll -CheckForSizeMin $CheckForSizeMin -CheckForSizeMax $CheckForSizeMax -CheckHidden $CheckHidden
+Invoke-DriveScan -Drives $drivestoscan -OutputFile $OutputFile -hourdirection $hrdirection -hoursago $hoursago -FilterApp $FilterApp -CheckFor $CheckFor -CheckForExt $CheckForExt -TempUFAll $TempUFAll -CheckForSizeMin $CheckForSizeMin -CheckForSizeMax $CheckForSizeMax -CheckHidden $CheckHidden -ScanFilterfn $ScanFilterfn
 
 # add a summary of directory counts to the output
 if (Test-Path $OutputFile) {
     $TempSumDirCnt = New-TemporaryFile
     "`nSummary counts of directories:`n" | Out-File -FilePath $TempSumDirCnt -Encoding UTF8
-    Get-DirectoryFileCounts -Filename $OutputFile | Out-File -FilePath $TempSumDirCnt -Append -Encoding UTF8
+    gitdirfilecounts -Filename $OutputFile | Out-File -FilePath $TempSumDirCnt -Append -Encoding UTF8
     "`n" | Out-File -FilePath $TempSumDirCnt -Append -Encoding UTF8
     Get-Content $TempSumDirCnt | Out-File -FilePath $OutputFile -Append -Encoding UTF8
     Remove-Item $TempSumDirCnt
@@ -1079,7 +1067,7 @@ if ($copytodw -ieq 'Y' ) {
 # Highlight key file types which changed and copy them if requested
 $fndirsep = "-"
 if ( $ShowHighlights -ieq 'Y' ) { 
-    findfilestohighlight -outfile $OutputFile -unfall $TempUFAll -copytodw $CopyHighlights -copyrpterr $CopyReportErrors -resfolder $resfldpath -fnsep $fndirsep -CopyMetaInfo $CopyMetaInfo
+    findfilestohighlight -outfile $OutputFile -unfall $TempUFAll -copytodw $CopyHighlights -copyrpterr $CopyReportErrors -resfolder $resfldpath -fnsep $fndirsep -CopyMetaInfo $CopyMetaInfo -CopyHLFilter $CopyHLFilter -CopyHLFilterFn $CopyHLFilterfn
 }
 
 if (-not (Test-Path $OutputFile))  { Write-Host "No results found." }
@@ -1097,5 +1085,4 @@ if (Test-Path $OutputFile) {
     relocateoutput -OutputFile $OutputFile -resfldpath $resfldpath -fndirsep $fndirsep
 }
 
-clearpressedkeys
-read-host "Press ENTER to continue"
+waitbeforeexit
