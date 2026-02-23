@@ -34,6 +34,7 @@
 # TODO
 # BUG: Filter not working as expected due to the fact that the filter is not applied to highlited files (as designed)
 # BUG: fix hang in powershell 7.x
+# FRM: change how directory counts are created, so they depth is set to 3 or something, not the full path
 # FRM: use checkfordebugger to see if it is running if so, switch to single threaded or give option
 # FRM: Add a debug switch to make use of single threed scan and additional output
 # FMR: allow different filter options (None, Light, Full, custom) - consider external file of dirs to filter as input
