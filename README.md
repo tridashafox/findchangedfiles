@@ -36,12 +36,12 @@ The script can search for different file types and provides these functions:
 
 5. **Directory Count Summary**
    
-   A total of changed files is rolled up into a total for a directory path. Currently this is set to five levels deep at most.
+   A total of changed files is rolled up into a total for a directory path with a specified depth.
   
-## Example script run
+<!-- ## Example script run -->
 
 <!-- ![My diagram](example1.png) -->
-  <!--     --snip-- -->
+<!--     --snip-- -->
 
 ## Usage Notes
 
@@ -60,6 +60,7 @@ The script will ask for all the options, or they can be passed as switches on th
 | CheckForSizeMax   | int    | Include files below this maximum size (in bytes). Use -1 for no limit.                                                                                         | -1      |
 | FilterApp         | string | Y to apply a filter that excludes certain directories from scan results.                                                                                       | N       |
 | ScanFilterfn      | string | File name containing a list of directories to exclude during scanning (used when FilterApp = Y).                                                               | —       |
+| ShowDirCounts     | int    | Shows a roll up total of found items by directory. 0 - don't show, otherwise depth to use for roll up.                                                         | 4       |
 | ShowHighlights    | string | Y to list key file types that changed.                                                                                                                         | Y       |
 | CopyHighlights    | string | Y to copy highlighted files to a temporary directory in Downloads.                                                                                             | N       |
 | HighlightFilter   | string | Y to apply a filter excluding certain directories from highlighted files.                                                                                      | N       |
