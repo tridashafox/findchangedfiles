@@ -53,8 +53,8 @@ param (
     [string]$ScanFilterfn,         # Name of a file which contains a list of directories which should not be checked for changes if FilterApp is 'Y'
     [string]$ShowHighlights,       # Look for key file types that changed and list them out, default is 'Y'
     [string]$CopyHighlights,       # Copy files found by ShowHighlights to a temp directory in downloads, default is 'N'
-    [string]$CopyHLFilter,         # Y means apply filter to not copy highlighted files from specific directories.
-    [string]$CopyHLFilterfn,       # Name of a file which contains a list of directories from which highlighted files should not be copied if CopyHLFilter is 'Y'
+    [string]$HighlightFilter,      # Y means apply filter to the highlighted files from specific directories.
+    [string]$HighlightFilterfn,    # Name of a file which contains a list of directories from which highlighted files excluded
     [string]$CopyMetaInfo,         # Create a json file with info about for each file found by ShowHighlights, default is 'N'
     [string]$CopyReportErrors      # Report errors during the ShowHighlights operation into the results file, default is 'N'
 )
@@ -420,6 +420,71 @@ function doScanfor {
 }
 
 ########################################################################
+# create a filter pattern string to be used to filter out noisy files not of interest
+#
+function buildfilterpatern { 
+    param (
+        [string]$ExcludeFilelist
+    )
+
+    $textfilterpat = ""
+    if (-not [string]::IsNullOrEmpty($ExcludeFilelist) -and (Test-Path -Path $ExcludeFilelist -PathType Leaf)) {
+        $patsp = "|" 
+        $textfilterpat = (
+            Get-Content -Path $ExcludeFilelist | 
+                Where-Object   { $_.Trim() -ne ''    } |   # Skip empty lines
+                ForEach-Object { $_.Trim()           } |   # Remove leading/trailing spaces
+                ForEach-Object { [regex]::Escape($_) }     # Escape special chars
+        ) -join $patsp
+
+        if ($textfilterpat -eq $patsp) {  $textfilterpat = ""}
+        elseif ($textfilterpat.Count -gt 0 -and $textfilterpat[-1] -ne $patsp) { $textfilterpat +=  $patsp } # add missing end of pat pipe
+    }
+
+    if ($textfilterpat.Count -eq 0) { Write-Host "[Warning] Filter file '$ExcludeFilelist' does not exist or contains no entries." -ForegroundColor Yellow}
+
+    <#
+    # For DEBUGGING & - creates a scoped block
+    &{
+        # dump the filter txt to dowloads dir
+        $dwdir = (New-Object -ComObject Shell.Application).NameSpace('shell:Downloads').Self.Path
+        $dboutfn = $dwdir + "\sfc_debug_filter.txt"
+        $textfilterpat | Add-Content -Path $dboutfn
+    } 
+    #>
+    
+    return $textfilterpat
+}
+
+########################################################################
+# create a filter string array of directory paths from passed file
+#
+function buildfilterarray { 
+    param (
+        [string]$ExcludeFilelist
+    )
+
+    $textfilterarr = @()
+    if (-not [string]::IsNullOrEmpty($ExcludeFilelist) -and (Test-Path -Path $ExcludeFilelist -PathType Leaf)) {
+        $textfilterarr = Get-Content -Path $ExcludeFilelist
+    }
+
+    if ($textfilterarr.Count -eq 0) { Write-Host "[Warning] Filter file '$ExcludeFilelist' does not exist or contains no entries." -ForegroundColor Yellow}
+
+    <#
+    # For DEBUGGING & - creates a scoped block
+    &{
+        # dump the filter txt to dowloads dir
+        $dwdir = (New-Object -ComObject Shell.Application).NameSpace('shell:Downloads').Self.Path
+        $dboutfn = $dwdir + "\sfc_debug_filter.txt"
+        $textfilterpat | Add-Content -Path $dboutfn
+    } 
+    #>
+    
+    return $textfilterarr
+}
+
+########################################################################
 # looks for files with specific extenions in unfiltered full list (unfall)  
 # and adds results to passed output file (outfile)
 #
@@ -432,13 +497,13 @@ function findfilestohighlight {
         [string]$resfolder,
         [string]$fnsep,
         [string]$CopyMetaInfo,
-        [string]$CopyHLFilter,
-        [string]$CopyHLFilterfn
+        [string]$HighlightFilter,
+        [string]$HighlightFilterfn
         )
 
 
-    $filtercopyhlpat = @()
-    if ($CopyHLFilter -ieq 'Y') { $filtercopyhlpat = buildfilterarray($CopyHLFilterfn) }
+    $filterhlpat = @()
+    if ($HighlightFilter -ieq 'Y') { $filterhlpat = buildfilterarray($HighlightFilterfn) }
 
     $filteredfiles = Get-Content -Path $unfall | Where-Object { $ExtsToHilight -contains [System.IO.Path]::GetExtension($_.Trim().Split()[-1]) }
     $filteredfiles = $filteredfiles | Where-Object { $_ -notlike "*   0*" } # remove zero byte files
@@ -461,7 +526,7 @@ function findfilestohighlight {
 
     # print on console number of found files
     $sizeoffnd = $filteredfiles | Measure-Object -Line | Select-Object -ExpandProperty Lines
-    Write-Host "Highlighted # modified or created files"  $sizeoffnd 
+    Write-Host "Highlighted # modified or created files (no filter)"  $sizeoffnd 
 
     # get filelist in good format 
     $filesToCopyraw = $filteredfiles -split [Environment]::NewLine
@@ -481,27 +546,40 @@ function findfilestohighlight {
     $filesToCopy = $filesToCopy | ForEach-Object { [string]$_ } ## make sure string array after sort
 
     # add title and put into output files if there is anything to report.
-    if ($filesToCopy.Count -gt 0) {
-        Add-Content -Path $outfile -Value ""
-        $filteredtitle = "Highlights - Key file types which changed (exe,bat,pdf,jpg,png,gif,ico,docx,mp4,tiff,webp,afphoto,psd,pic):"
-        Add-Content -Path $outfile -Value $filteredtitle -Encoding UTF8
-        Add-Content -Path $outfile -Value ""
-        $filesToCopy | Add-Content -Path $outfile -Encoding UTF8
-    } else { 
+    if ($filesToCopy.Count -eq 0) {
         $filteredtitle = "No files to highlight found."
         Add-Content -Path $outfile -Value $filteredtitle -Encoding UTF8
+    }
+    else 
+    {
+        Add-Content -Path $outfile -Value ""
+        $filteredtitle = ""
+        if ($HighlightFilter -eq 'Y') { $filteredtitle = "Filtered " }
+        $filteredtitle += "Highlights - Key file types which changed (exe,bat,pdf,jpg,png,gif,ico,docx,mp4,tiff,webp,afphoto,psd,pic):"
+        Add-Content -Path $outfile -Value $filteredtitle -Encoding UTF8
+        Add-Content -Path $outfile -Value ""
+
+        # report on line but also check if filtered out
+        $filterdLines = @()
+        foreach ($line in $filesToCopy) {
+            $filename = ($line -split ' ', 4)[-1]  # Split into 4 parts, take the last part
+            $filename = $filename.Trim()
+            $shouldSkip = $false
+            foreach ($excludeDdg in $filterhlpat) { if ($filename.Length -ge $excludeDdg.Length -and $filename.Substring(0, $excludeDdg.Length) -ieq $excludeDdg) { $shouldSkip = $true; $skippedcnt++; break } }
+            if (-not $shouldSkip) { $filterdLines += $line}
+        }
+        if ($HighlightFilter -eq 'Y') { Write-Host "Highlighted # modified or created files (after filter)" $filterdLines.Count }
+        $filterdLines | Add-Content -Path $outfile -Encoding UTF8; 
     }
 
     if ($copytodw -ieq 'Y') {
         if ($resfolder.Length -gt 0) {
             $tempFolderPath = $resfolder
-            # Write-Host "Highlighted files will be copied to $tempFolderPath"
-
             $counterstart = 1 # start at 1 - zero is used for the log output
             $counter = $counterstart
             $countercpErr = 0
             $skippedcnt = 0
-            foreach ($line in $filesToCopy) {
+            foreach ($line in $filterdLines) {
                 $filename = ($line -split ' ', 4)[-1]  # Split into 4 parts, take the last part
                 $filename = $filename.Trim()
 
@@ -528,7 +606,7 @@ function findfilestohighlight {
                             $shouldSkip = $false
                             
                             # exclude items from copy in match entry in filter
-                            foreach ($excludeDdg in $filtercopyhlpat) { if ($filename.Length -ge $excludeDdg.Length -and $filename.Substring(0, $excludeDdg.Length) -ieq $excludeDdg) { $shouldSkip = $true; $skippedcnt++; break } }
+                            #foreach ($excludeDdg in $filterhlpat) { if ($filename.Length -ge $excludeDdg.Length -and $filename.Substring(0, $excludeDdg.Length) -ieq $excludeDdg) { $shouldSkip = $true; $skippedcnt++; break } }
 
                             if (-not $shouldSkip) 
                             {
@@ -639,71 +717,6 @@ function postprocess {
         $msg = $drivelet + ":\ number of modified or created files"
         Write-Host $msg $lnsnum
     }
-}
-
-########################################################################
-# create a filter pattern string to be used to filter out noisy files not of interest
-#
-function buildfilterpatern { 
-    param (
-        [string]$ExcludeFilelist
-    )
-
-    $textfilterpat = ""
-    if (-not [string]::IsNullOrEmpty($ExcludeFilelist) -and (Test-Path -Path $ExcludeFilelist -PathType Leaf)) {
-        $patsp = "|" 
-        $textfilterpat = (
-            Get-Content -Path $ExcludeFilelist | 
-                Where-Object   { $_.Trim() -ne ''    } |   # Skip empty lines
-                ForEach-Object { $_.Trim()           } |   # Remove leading/trailing spaces
-                ForEach-Object { [regex]::Escape($_) }     # Escape special chars
-        ) -join $patsp
-
-        if ($textfilterpat -eq $patsp) {  $textfilterpat = ""}
-        elseif ($textfilterpat.Count -gt 0 -and $textfilterpat[-1] -ne $patsp) { $textfilterpat +=  $patsp } # add missing end of pat pipe
-    }
-
-    if ($textfilterpat.Count -eq 0) { Write-Host "[Warning] Filter file '$ExcludeFilelist' does not exist or contains no entries." -ForegroundColor Yellow}
-
-    <#
-    # For DEBUGGING & - creates a scoped block
-    &{
-        # dump the filter txt to dowloads dir
-        $dwdir = (New-Object -ComObject Shell.Application).NameSpace('shell:Downloads').Self.Path
-        $dboutfn = $dwdir + "\sfc_debug_filter.txt"
-        $textfilterpat | Add-Content -Path $dboutfn
-    } 
-    #>
-    
-    return $textfilterpat
-}
-
-########################################################################
-# create a filter string array of directory paths from passed file
-#
-function buildfilterarray { 
-    param (
-        [string]$ExcludeFilelist
-    )
-
-    $textfilterarr = @()
-    if (-not [string]::IsNullOrEmpty($ExcludeFilelist) -and (Test-Path -Path $ExcludeFilelist -PathType Leaf)) {
-        $textfilterarr = Get-Content -Path $ExcludeFilelist
-    }
-
-    if ($textfilterarr.Count -eq 0) { Write-Host "[Warning] Filter file '$ExcludeFilelist' does not exist or contains no entries." -ForegroundColor Yellow}
-
-    <#
-    # For DEBUGGING & - creates a scoped block
-    &{
-        # dump the filter txt to dowloads dir
-        $dwdir = (New-Object -ComObject Shell.Application).NameSpace('shell:Downloads').Self.Path
-        $dboutfn = $dwdir + "\sfc_debug_filter.txt"
-        $textfilterpat | Add-Content -Path $dboutfn
-    } 
-    #>
-    
-    return $textfilterarr
 }
 
 ########################################################################
@@ -953,7 +966,7 @@ if (-not $PSBoundParameters.ContainsKey('CheckForSizeMax') -or $ModDefault) {
 }
 
 # Options: Apply Filter to directories to scan
-$FilterApp = getYNinput $ModDefault $FilterApp "FilterApp" "Apply filter to directories to scan?" $inyndef
+$FilterApp = getYNinput $ModDefault $FilterApp "FilterApp" "Apply filter to directories to scan?"
 if ($FilterApp -ieq 'Y' -and $ScanFilterfn.Length -eq 0) {
     while ($true) {
         $ScanFilterfn = $(Read-Host "File containing list of directories to omit from scan?").ToLower()
@@ -965,6 +978,16 @@ if ($FilterApp -ieq 'Y' -and $ScanFilterfn.Length -eq 0) {
 # Options: Highlighted files - different default depending on file type requested
 $ShowHighlights = getYNinput $ModDefault $ShowHighlights "ShowHighlights" "Highlight key changed file types at end?" 'Y'
 if ($ShowHighlights -ieq 'Y') { 
+    $HighlightFilter = getYNinput $ModDefault $HighlightFilter "HighlightFilter" "Apply filter to highlighting?" 
+
+    if ($HighlightFilter -ieq 'Y' -and $HighlightFilterfn.Length -eq 0) {
+        while ($true) {
+            $HighlightFilterfn = $(Read-Host "File containing directories excluded highlighting?").ToLower()
+            if ([string]::IsNullOrEmpty($HighlightFilterfn)) { Write-Host "No file provided." -ForegroundColor Red; continue }
+            if (Test-Path -Path $HighlightFilterfn -PathType Leaf) { break } else { Write-Host "File not found." -ForegroundColor Red; continue  }
+        }
+    }
+
     if ($CheckFor -ieq 'ALL') { $inyndef =  'N' } else { $inyndef =  'Y' }
     $CopyHighlights   = getYNinput $ModDefault $CopyHighlights   "CopyHighlights"   "Copy highlighted files to an output directory?" $inyndef 
     $CopyMetaInfo     = getYNinput $ModDefault $CopyMetaInfo     "CopyMetaInfo"     "Create a [fn].meta.json with path info for each copied highlighted file an output directory?" 'N'
@@ -973,18 +996,7 @@ if ($ShowHighlights -ieq 'Y') {
     $CopyHighlights = 'N'
     $CopyMetaInfo = 'N' 
     $CopyReportErrors = 'N'
-}
-
-# Options: Apply filter to highlight copy 
-if ($CopyHighlights -ieq 'Y') {
-    $CopyHLFilter = getYNinput $ModDefault $CopyHLFilter "CopyHLFilter" "Apply filter to copying of highlighted files?" 
-}
-if ($CopyHLFilter -ieq 'Y' -and $CopyHighlights -ieq 'Y' -and $CopyHLFilterfn.Length -eq 0) {
-    while ($true) {
-        $CopyHLFilterfn = $(Read-Host "File containing directories to exclude from copying highlighted files?").ToLower()
-        if ([string]::IsNullOrEmpty($CopyHLFilterfn)) { Write-Host "No file provided." -ForegroundColor Red; continue }
-        if (Test-Path -Path $CopyHLFilterfn -PathType Leaf) { break } else { Write-Host "File not found." -ForegroundColor Red; continue  }
-    }
+    $HighlightFilter = 'N'
 }
 
 # Start a transaction log so it can be included in the output file for later reference
@@ -1010,11 +1022,11 @@ if ($HoursToCheck -lt 0) {
 
 $msghid = if ($CheckHidden -eq 'Y') { "including hidden files" } else { "excluding hidden files" }
 $maxmsg = if ($CheckForSizeMax -eq '-1') { "no maximum size" } else { "maximum size $CheckForSizeMax bytes" }
-$msgflt = if ($FilterApp -eq 'Y') { "with filter applied." } else { "with no filter applied." }
+$msgflt = if ($FilterApp -eq 'Y') { "filter applied using $ScanFilterfn" } else { "no filter applied." }
 $metaCt = if ($CopyMetaInfo -eq 'Y') { "will be created." } else { "will not be created." }
 $msgchi = if ($CopyHighlights -eq 'Y') { "and will be copied to an output directory."} else { "only." }
 $msgext = if ($CheckFor -eq 'EXT') { "Extension .$CheckForExt" } else { "" }
-$msgflc = if ($CopyHLFilter -eq 'Y') { "with filter applied." } else { "with no filter applied." }
+$msgflc = if ($HighlightFilter -eq 'Y') { "filter applied using $HighlightFilterFn" } else { "no filter applied." }
 
 Write-Host "`n[INFO] Scanning using values..." -ForegroundColor Green
 if ($WhichDrive -eq 'ALL') { Write-Host " - Drives: $Drives" } else { Write-Host " - Drives:" $WhichDrive}
@@ -1023,15 +1035,13 @@ Write-Host " - File types: $CheckFor" $msgext
 Write-Host " - Hidden files: $msghid"
 Write-Host " - File size between: $CheckForSizeMin bytes and $maxmsg"
 Write-Host " - Filter scan: $msgflt"
-Write-Host " - Filter copied highlighted files: $msgflc"
-Write-Host " - Scan Filter input file: $ScanFilterfn"
-Write-Host " - Copy highlight filter input file: $CopyHLFilterFn"
 
 if ($ShowHighlights -eq 'Y') {
     Write-Host "`n[INFO] Highlighting enabled..." -ForegroundColor Green
     Write-Host " - Extensions highlighted: $ExtsToHilight"
     Write-Host " - Files modified $hrdirection $hoursago will be reported" $msgchi
     Write-Host " - meta.json files for each highlighted file:" $metaCt
+    Write-Host " - Filter highlighted files: $msgflc"
 }
 
 Write-Host ""
@@ -1068,7 +1078,7 @@ if ($copytodw -ieq 'Y' ) {
 # Highlight key file types which changed and copy them if requested
 $fndirsep = "-"
 if ( $ShowHighlights -ieq 'Y' ) { 
-    findfilestohighlight -outfile $OutputFile -unfall $TempUFAll -copytodw $CopyHighlights -copyrpterr $CopyReportErrors -resfolder $resfldpath -fnsep $fndirsep -CopyMetaInfo $CopyMetaInfo -CopyHLFilter $CopyHLFilter -CopyHLFilterFn $CopyHLFilterfn
+    findfilestohighlight -outfile $OutputFile -unfall $TempUFAll -copytodw $CopyHighlights -copyrpterr $CopyReportErrors -resfolder $resfldpath -fnsep $fndirsep -CopyMetaInfo $CopyMetaInfo -HighlightFilter $HighlightFilter -HighlightFilterFn $HighlightFilterfn
 }
 
 if (-not (Test-Path $OutputFile))  { Write-Host "No results found." }
