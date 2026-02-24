@@ -30,13 +30,12 @@
 # TODO
 # update readme.md
 # BUG: fix hang in powershell 7.x
-# FRM: change how directory counts are created, so they depth is set to 3 or something, not the full path
-# FRM: use checkfordebugger to see if it is running if so, switch to single threaded or give option
-# FRM: Add a debug switch to make use of single threed scan and additional output
+# FRM: allow the directory depth for summary roll up to be set as a param, currently passed as 5
+# FRM: use checkfordebugger to see if it is running if so, give option to switch to single threaded
 # FMR: move extension lists into function near buildfilters
 # FMR: allow a directory to be scanned rather than just a drive
-# FMR: add in a built in canary test to ensure finding files and working
 # FMR: consider adding result analysis tools
+# FMR: add in a built in canary test to ensure finding files and working
 # FMR: add functional tests
 
 param (
@@ -238,12 +237,15 @@ function getYNinput {
 # Parse results file and display a summary of file counts in directories
 # NOTE will fail if any of the formating of the output is changed
 #
-function gitdirfilecounts {
+function getdirfilecounts {
     param(
         [Parameter(Mandatory=$true)]
-        [string]$Filename
+        [string]$Filename,
+        [int]$MaxDepth
     )
     
+    if ($MaxDepth -lt 3) {$MaxDepth = 3}
+
     $drivePattern = '\b([a-zA-Z]):\\'
     $dirCounts = @{}
     $stopProcessing = $false
@@ -274,12 +276,21 @@ function gitdirfilecounts {
             $drivePos = $line.IndexOf($fullMatch)
             $trimmedPath = $line.Substring($drivePos).Trim()
             
-            # Get parent directory
-            $parentDir = Split-Path $trimmedPath -Parent
-            if (-not $dirCounts.ContainsKey($parentDir)) {
-                $dirCounts[$parentDir] = 0
+            # Get directory path only (no filename)
+            $dirPath = Split-Path $trimmedPath -Parent
+            
+            # Split directory into levels and take first N levels
+            $pathParts = $dirPath -split '\\' | Where-Object { $_ }
+            $shortPath = if ($pathParts.Count -le $MaxDepth) { 
+                $dirPath 
+            } else { 
+                ($pathParts[0..($MaxDepth-1)] -join '\') 
             }
-            $dirCounts[$parentDir]++
+            
+            if (-not $dirCounts.ContainsKey($shortPath)) {
+                $dirCounts[$shortPath] = 0
+            }
+            $dirCounts[$shortPath]++
         }
     }
 
@@ -501,10 +512,11 @@ function findfilestohighlight {
         [string]$HighlightFilterfn
         )
 
-
+    # Get filter pattern if provided
     $filterhlpat = @()
     if ($HighlightFilter -ieq 'Y') { $filterhlpat = buildfilterarray($HighlightFilterfn) }
 
+    # build up list of files from raw file list of all files
     $filteredfiles = Get-Content -Path $unfall | Where-Object { $ExtsToHilight -contains [System.IO.Path]::GetExtension($_.Trim().Split()[-1]) }
     $filteredfiles = $filteredfiles | Where-Object { $_ -notlike "*   0*" } # remove zero byte files
 
@@ -553,9 +565,9 @@ function findfilestohighlight {
     else 
     {
         Add-Content -Path $outfile -Value ""
-        $filteredtitle = ""
-        if ($HighlightFilter -eq 'Y') { $filteredtitle = "Filtered " }
-        $filteredtitle += "Highlights - Key file types which changed (exe,bat,pdf,jpg,png,gif,ico,docx,mp4,tiff,webp,afphoto,psd,pic):"
+        if ($HighlightFilter -eq 'Y') { $filtrtxt = "(filtered)" } else { $filtrtxt = ""}
+        # Don't change the start of this string it's used to locate the end of the scan when creating for the directory counts
+        $filteredtitle += "Highlights - Key file types which changed $filtrtxt (exe,bat,pdf,jpg,png,gif,ico,docx,mp4,tiff,webp,afphoto,psd,pic):"
         Add-Content -Path $outfile -Value $filteredtitle -Encoding UTF8
         Add-Content -Path $outfile -Value ""
 
@@ -1063,7 +1075,7 @@ Invoke-DriveScan -Drives $drivestoscan -OutputFile $OutputFile -hourdirection $h
 if (Test-Path $OutputFile) {
     $TempSumDirCnt = New-TemporaryFile
     "`nSummary counts of directories:`n" | Out-File -FilePath $TempSumDirCnt -Encoding UTF8
-    gitdirfilecounts -Filename $OutputFile | Out-File -FilePath $TempSumDirCnt -Append -Encoding UTF8
+    getdirfilecounts -Filename $OutputFile -MaxDepth 5| Out-File -FilePath $TempSumDirCnt -Append -Encoding UTF8
     "`n" | Out-File -FilePath $TempSumDirCnt -Append -Encoding UTF8
     Get-Content $TempSumDirCnt | Out-File -FilePath $OutputFile -Append -Encoding UTF8
     Remove-Item $TempSumDirCnt
