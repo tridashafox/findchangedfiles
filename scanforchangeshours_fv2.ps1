@@ -976,7 +976,7 @@ $CleanTempFiles = getYNinput $ModDefault $CleanTempFiles "CleanTempFiles" "Use W
     For the same value and logic a change of type changes the behavior. 
 #>
 if ($HoursToCheck -eq 0 -or $ModDefault) {
-    if ($ModDefault -and $HoursToCheck -lt 0) { $defval = $HoursToCheck } else { $defval = -3}
+    if ($ModDefault -and $HoursToCheck -ne 0) { $defval = $HoursToCheck } else { $defval = -3}
     $invvuhr = $true
     while ($invvuhr)
     {
