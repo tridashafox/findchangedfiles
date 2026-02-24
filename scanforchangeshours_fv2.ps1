@@ -30,7 +30,6 @@
 # TODO
 # update readme.md
 # BUG: fix hang in powershell 7.x
-# FRM: allow the directory depth for summary roll up to be set as a param, currently passed as 5
 # FRM: use checkfordebugger to see if it is running if so, give option to switch to single threaded
 # FMR: move extension lists into function near buildfilters
 # FMR: allow a directory to be scanned rather than just a drive
