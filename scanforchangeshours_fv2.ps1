@@ -44,12 +44,13 @@ param (
     [double]$HoursToCheck,         # Number of hours to look back for changes, default is -3, note this can have a decimal point e.g. -0.5 (last half-hour). If postive looks for changed files before specified hours.
     [string]$WhichDrive,           # Which drive to scan, or all drives, default is ALL
     [string]$CheckFor,             # Which types of files to check for, can be  is ALL, IMG (anything at is an Image), EXT (askes for an CheckForExt), EXE (anything that executes), default is ALL
-    [string]$CheckForExt,          # A specific extension to scan for (don't include the '.' before the extension), default PNG. Ignored unless CheckFor is EXT
+    [string]$CheckForExt,          # A specific extension to scan for (don't include the '.' before the extension), default EXE. Ignored unless CheckFor is EXT
     [string]$CheckHidden,          # Y if want to try to scan hidden files, default is 'N'
     [int]$CheckForSizeMin,         # Include files above this min size, default is 0 (all files)
     [int]$CheckForSizeMax,         # Include files blow this max size, default is -1 (all files)
     [string]$FilterApp,            # Y means apply filter to the scan to not report on specific directories.
     [string]$ScanFilterfn,         # Name of a file which contains a list of directories which should not be checked for changes if FilterApp is 'Y'
+    [int]$ShowDirCounts,           # Shows a roll up total of found items by directory. 0 - don't show, otherwise depth to use for roll up, default is 4
     [string]$ShowHighlights,       # Look for key file types that changed and list them out, default is 'Y'
     [string]$CopyHighlights,       # Copy files found by ShowHighlights to a temp directory in downloads, default is 'N'
     [string]$HighlightFilter,      # Y means apply filter to the highlighted files from specific directories.
@@ -241,10 +242,10 @@ function getdirfilecounts {
     param(
         [Parameter(Mandatory=$true)]
         [string]$Filename,
-        [int]$MaxDepth
+        [int]$Depth
     )
     
-    if ($MaxDepth -lt 3) {$MaxDepth = 3}
+    $MaxDepth = $Depth + 1
 
     $drivePattern = '\b([a-zA-Z]):\\'
     $dirCounts = @{}
@@ -496,6 +497,30 @@ function buildfilterarray {
 }
 
 ########################################################################
+# output a roll up of directory counts
+#
+function showdircountsinfile {
+    param (
+        [string] $OutputFile,
+        $ShowDirCounts  # 0 - don't show, otherwise the depth to use for rollup of sum
+    )
+
+    if ($ShowDirCounts -gt 0 -and (Test-Path $OutputFile)) {
+        $TempSumDirCnt = New-TemporaryFile
+        $tempcntoutput = getdirfilecounts -Filename $OutputFile -Depth $ShowDirCounts
+        if ($tempcntoutput.Count -gt 0) {
+            "`nSummary counts of directories:`n" | Out-File -FilePath $TempSumDirCnt -Encoding UTF8
+            $tempcntoutput | Out-File -FilePath $TempSumDirCnt -Append -Encoding UTF8
+            "`n" | Out-File -FilePath $TempSumDirCnt -Append -Encoding UTF8
+        }
+        else { "`nNo files to summarize counts of directories.`n" | Out-File -FilePath $TempSumDirCnt -Encoding UTF8 }
+
+        Get-Content $TempSumDirCnt | Out-File -FilePath $OutputFile -Append -Encoding UTF8
+        Remove-Item $TempSumDirCnt
+    }
+}
+
+########################################################################
 # looks for files with specific extenions in unfiltered full list (unfall)  
 # and adds results to passed output file (outfile)
 #
@@ -514,7 +539,7 @@ function findfilestohighlight {
 
     # Get filter pattern if provided
     $filterhlpat = @()
-    if ($HighlightFilter -ieq 'Y') { $filterhlpat = buildfilterarray($HighlightFilterfn) }
+    if ($HighlightFilter -ieq 'Y') { $filterhlpat = buildfilterarray -ExcludeFilelist $HighlightFilterfn }
 
     # build up list of files from raw file list of all files
     $filteredfiles = Get-Content -Path $unfall | Where-Object { $ExtsToHilight -contains [System.IO.Path]::GetExtension($_.Trim().Split()[-1]) }
@@ -602,7 +627,7 @@ function findfilestohighlight {
                             $fullPathStr = $partname.FullName
                             $baseFileName = $partname.BaseName
                             $dirpathonly = $partname.Directory.FullName
-                            $pathhash = getpathash $dirpathonly
+                            $pathhash = getpathash -Path $dirpathonly
                         }
                         catch {
                             $countercpErr++
@@ -720,6 +745,11 @@ function postprocess {
 
         $nonBlankLines = $filteredLines | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
         $cleanedLines = $nonBlankLines | Where-Object { $_ -notmatch '^Drive\s+[A-Z]:\\' }
+
+        # clean out VScode debugger noise which can appear when it tries to get vars for the var/watch window
+        if ($IsDebug) {
+            $cleanedLines = $cleanedLines | Where-Object { $_ -notmatch '^\(base\)|\^>>' }
+        }
         $lnsnum = $cleanedLines.Count
 
         # Output results
@@ -757,7 +787,7 @@ function Invoke-SingleDriveScan {
     $TempFileX = New-TemporaryFile
     $temploc = $WhichDrive + ":\"
     $filterpatstr = ''
-    if ($FilterApp -eq 'Y') { $filterpatstr = buildfilterpatern($ScanFilterfn) }
+    if ($FilterApp -eq 'Y') { $filterpatstr = buildfilterpatern -ExcludeFilelist $ScanFilterfn }
 
     $result = doScanfor -drive $temploc -outfile $TempFileX -hrdir $hourdirection -hago $hoursago -dofilter $FilterApp -filterpatstr $filterpatstr -exttochk $CheckFor -exttochkact $CheckForExt -unfall $TempUFAll -minSize $CheckForSizeMin -maxSize $CheckForSizeMax -checkforcehidden $CheckHidden -brootonly $false
     showscanduration -Result $result
@@ -811,7 +841,7 @@ function Invoke-DriveScan {
         $tempRootUFAll = New-TemporaryFile 
         $TempFilesMapUFAll[$driveLetter] += $tempRootUFAll 
         $filterpatstr = ''
-        if ($FilterApp -eq 'Y') { $filterpatstr = buildfilterpatern($ScanFilterfn) }
+        if ($FilterApp -eq 'Y') { $filterpatstr = buildfilterpatern -ExcludeFilelist $ScanFilterfn }
 
         # create drive root level job
         $jobs += Start-Job -ScriptBlock ${function:doScanfor} -ArgumentList (Join-Path $drive "\*"), $tempRoot, $hourdirection, $hoursago, $FilterApp, $filterpatstr, `
@@ -888,7 +918,10 @@ function Invoke-DriveScan {
 # FOR DEBUGGING show details of the enviroment if running under a debugger
 # POWERSHELL oddies, even though checkfordebugger returns a string, the if might not enforce the string type, causing the
 # condition not match the string "none" when "none" is returned. So need the $() around the return from checkfordebugger
-if ($(checkfordebugger) -ne "none") { Show-EnvironmentCheck }
+$IsDebug = $false
+if ($(checkfordebugger) -ne "none") { $IsDebug = $true; }
+
+if ($IsDebug) { Show-EnvironmentCheck }
 
 [console]::bufferwidth = 30000
 $dwdir = (New-Object -ComObject Shell.Application).NameSpace('shell:Downloads').Self.Path
@@ -955,7 +988,7 @@ if (!$CheckFor -or $ModDefault) {
 
 if ($CheckFor -eq 'EXT') {
     if (!$CheckForExt -or $ModDefault) {
-        if ($ModDefault -and $CheckForExt) { $defval = $CheckForExt } else { $defval = "PNG" }
+        if ($ModDefault -and $CheckForExt) { $defval = $CheckForExt } else { $defval = "EXE" }
         $CheckForExt = $(Read-Host "Which extension do you want to checkfor (don't include a '.')?: [default $defval]").ToUpper()
         if ($CheckForExt -ieq '') { $CheckForExt = $defval}
     } 
@@ -984,6 +1017,16 @@ if ($FilterApp -ieq 'Y' -and $ScanFilterfn.Length -eq 0) {
         $ScanFilterfn = $(Read-Host "File containing list of directories to omit from scan?").ToLower()
         if ([string]::IsNullOrEmpty($ScanFilterfn)) { Write-Host "No file provided." -ForegroundColor Red; continue }
         if (Test-Path -Path $ScanFilterfn -PathType Leaf) { break } else { Write-Host "File not found." -ForegroundColor Red; continue  }
+    }
+}
+
+# Options: Show directory counts
+if (-not $PSBoundParameters.ContainsKey('ShowDirCounts') -or $ModDefault) { 
+    if ($ModDefault -and $ShowDirCounts -ge 0 -and $ShowDirCounts -le 9) { $defval = $ShowDirCounts } else { $defval = '4' }
+    while ($true) {
+        $ShowDirCounts = Read-Host "Show directory summary counts (0 - don't show, max 9?: [default $defval]"
+        if ($ShowDirCounts -eq '') { $ShowDirCounts = $defval; break }
+        if ($ShowDirCounts -lt 0 -or $ShowDirCounts -gt 9) { Write-Host "Value must be minimum 0 and maximum 9." -ForegroundColor Red; continue } else {break}
     }
 }
 
@@ -1023,7 +1066,6 @@ if ( $cleantempfiles -ieq 'Y' ) {
 }
 
 # Message to say what the scan will be doing
-
 if ($HoursToCheck -lt 0) { 
     $hoursago = (Get-Date).AddHours($HoursToCheck) 
     $hrdirection = "after";
@@ -1034,11 +1076,12 @@ if ($HoursToCheck -lt 0) {
 
 $msghid = if ($CheckHidden -eq 'Y') { "including hidden files" } else { "excluding hidden files" }
 $maxmsg = if ($CheckForSizeMax -eq '-1') { "no maximum size" } else { "maximum size $CheckForSizeMax bytes" }
-$msgflt = if ($FilterApp -eq 'Y') { "filter applied using $ScanFilterfn" } else { "no filter applied." }
-$metaCt = if ($CopyMetaInfo -eq 'Y') { "will be created." } else { "will not be created." }
-$msgchi = if ($CopyHighlights -eq 'Y') { "and will be copied to an output directory."} else { "only." }
+$msgflt = if ($FilterApp -eq 'Y') { "filter applied using $ScanFilterfn" } else { "no filter applied" }
+$msgdcs = if ($ShowDirCounts -gt 0) {"shown with max depth $ShowDirCounts"} else { "not shown"}
+$metaCt = if ($CopyMetaInfo -eq 'Y') { "will be created" } else { "will not be created" }
+$msgchi = if ($CopyHighlights -eq 'Y') { "and will be copied to an output directory"} else { "only" }
 $msgext = if ($CheckFor -eq 'EXT') { "Extension .$CheckForExt" } else { "" }
-$msgflc = if ($HighlightFilter -eq 'Y') { "filter applied using $HighlightFilterFn" } else { "no filter applied." }
+$msgflc = if ($HighlightFilter -eq 'Y') { "filter applied using $HighlightFilterFn" } else { "no filter applied" }
 
 Write-Host "`n[INFO] Scanning using values..." -ForegroundColor Green
 if ($WhichDrive -eq 'ALL') { Write-Host " - Drives: $Drives" } else { Write-Host " - Drives:" $WhichDrive}
@@ -1047,6 +1090,7 @@ Write-Host " - File types: $CheckFor" $msgext
 Write-Host " - Hidden files: $msghid"
 Write-Host " - File size between: $CheckForSizeMin bytes and $maxmsg"
 Write-Host " - Filter scan: $msgflt"
+Write-Host " - Directory summary counts: $msgdcs"
 
 if ($ShowHighlights -eq 'Y') {
     Write-Host "`n[INFO] Highlighting enabled..." -ForegroundColor Green
@@ -1072,14 +1116,7 @@ if ( $WhichDrive -ne 'ALL') { $drivestoscan = @($WhichDrive + ":") } else { $dri
 Invoke-DriveScan -Drives $drivestoscan -OutputFile $OutputFile -hourdirection $hrdirection -hoursago $hoursago -FilterApp $FilterApp -CheckFor $CheckFor -CheckForExt $CheckForExt -TempUFAll $TempUFAll -CheckForSizeMin $CheckForSizeMin -CheckForSizeMax $CheckForSizeMax -CheckHidden $CheckHidden -ScanFilterfn $ScanFilterfn
 
 # add a summary of directory counts to the output
-if (Test-Path $OutputFile) {
-    $TempSumDirCnt = New-TemporaryFile
-    "`nSummary counts of directories:`n" | Out-File -FilePath $TempSumDirCnt -Encoding UTF8
-    getdirfilecounts -Filename $OutputFile -MaxDepth 5| Out-File -FilePath $TempSumDirCnt -Append -Encoding UTF8
-    "`n" | Out-File -FilePath $TempSumDirCnt -Append -Encoding UTF8
-    Get-Content $TempSumDirCnt | Out-File -FilePath $OutputFile -Append -Encoding UTF8
-    Remove-Item $TempSumDirCnt
-}
+showdircountsinfile -OutputFile $OutputFile -ShowDirCounts $ShowDirCounts
 
 # create a location to store the results and any highlited files
 $resfldpath = createoutputdir
