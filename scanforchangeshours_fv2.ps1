@@ -31,6 +31,7 @@
 # update readme.md
 # BUG: fix hang in powershell 7.x
 # FRM: use checkfordebugger to see if it is running if so, give option to switch to single threaded
+# FRM: add an option not to remove zero length files from the scan results 
 # FMR: move extension lists into function near buildfilters
 # FMR: allow a directory to be scanned rather than just a drive
 # FMR: consider adding result analysis tools
@@ -439,8 +440,8 @@ function buildfilterpatern {
     )
 
     $textfilterpat = ""
+    $patsp = "|" 
     if (-not [string]::IsNullOrEmpty($ExcludeFilelist) -and (Test-Path -Path $ExcludeFilelist -PathType Leaf)) {
-        $patsp = "|" 
         $textfilterpat = (
             Get-Content -Path $ExcludeFilelist | 
                 Where-Object   { $_.Trim() -ne ''    } |   # Skip empty lines
@@ -453,6 +454,12 @@ function buildfilterpatern {
     }
 
     if ($textfilterpat.Count -eq 0) { Write-Host "[Warning] Filter file '$ExcludeFilelist' does not exist or contains no entries." -ForegroundColor Yellow}
+
+    #  on all drives which need filtering for zero lenght files (TODO: make this an option)
+    $drives = Get-CimInstance -ClassName Win32_LogicalDisk -Filter "DriveType=3" | ForEach-Object { "$($_.DeviceID)" }
+    foreach ($drive in $drives) {
+        $textfilterpat += "  0 " + $drive[0]+ ":\\"+ $patsp # filter out zero lenght files, special case
+    }
 
     <#
     # For DEBUGGING & - creates a scoped block
