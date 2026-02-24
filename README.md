@@ -54,13 +54,13 @@ The script will ask for all the options, or they can be passed as switches on th
 | HoursToCheck      | double | Number of hours to look back for changes (e.g. -3 means last 3 hours, -0.5 means last half-hour). If positive, looks for changed files before specified hours. | -3      |
 | WhichDrive        | string | Drive to scan, or ‘ALL’ for all drives.                                                                                                                        | ALL     |
 | CheckFor          | string | Which types of files to check: ALL, IMG (images), EXT (specific extension), EXE (executables).                                                                 | ALL     |
-| CheckForExt       | string | Specific extension to scan for (without the .). Used when CheckFor = EXT.                                                                                      | PNG     |
+| CheckForExt       | string | Specific extension to scan for (without the .). Used when CheckFor = EXT.                                                                                      | EXE     |
 | CheckHidden       | string | Y to include hidden files in the scan.                                                                                                                         | N       |
 | CheckForSizeMin   | int    | Include files above this minimum size (in bytes).                                                                                                              | 0       |
 | CheckForSizeMax   | int    | Include files below this maximum size (in bytes). Use -1 for no limit.                                                                                         | -1      |
 | FilterApp         | string | Y to apply a filter that excludes certain directories from scan results.                                                                                       | N       |
 | ScanFilterfn      | string | File name containing a list of directories to exclude during scanning (used when FilterApp = Y).                                                               | —       |
-| ShowDirCounts     | int    | Shows a roll up total of found items by directory. 0 - don't show, otherwise depth to use for roll up.                                                         | 4       |
+| ShowDirCounts     | int    | Shows a roll up total of found files by directory. 0 - don't show, otherwise depth to use for roll up.                                                         | 4       |
 | ShowHighlights    | string | Y to list key file types that changed.                                                                                                                         | Y       |
 | CopyHighlights    | string | Y to copy highlighted files to a temporary directory in Downloads.                                                                                             | N       |
 | HighlightFilter   | string | Y to apply a filter excluding certain directories from highlighted files.                                                                                      | N       |
