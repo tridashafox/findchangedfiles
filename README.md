@@ -17,22 +17,26 @@ The script can search for different file types and provides these functions:
 
 ### Core Functions
 
-1. **List Changed Files**  
+1. **List Changed Files**
+
    List all files changed on all (or specified) drives in the last X hours. Writes results to a file in the output directory.
 
-2. **Highlight & Copy Important Files**  
+3. **Highlight & Copy Important Files**
+    
    For "highlighted" file types (pre-defined), copies changed files to an output directory for inspection.
 
    - Output directory: created in your Downloads folder, begins with `sfc-`
    - Optionally: for every copied file, generates a `[filename].meta.json` file with the original location.
      
-3. **Filters**
+4. **Filters**
+   
    Filters can applied to exclude directories from both List Changed Files and Highlight & Copy Important Files operations.
 
    - Directories to exclude are specified in a .txt file with each directory, e.g. C:\WINDOWS\ on a seperate line
 
-4. **Directory Count Summary**
-   A count of changed files is rolled up into a total for a directory path. Currently set to five levels deep at most.
+5. **Directory Count Summary**
+   
+   A total of changed files is rolled up into a total for a directory path. Currently this is set to five levels deep at most.
   
 ## Example script run
 
