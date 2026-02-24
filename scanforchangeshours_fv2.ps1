@@ -35,6 +35,7 @@
 # FRM: add an option not to remove zero length files from the scan results 
 # FMR: move extension lists into function near buildfilters
 # FMR: allow a directory to be scanned rather than just a drive
+# FMR: full review and code cleanup
 # FMR: consider adding result analysis tools
 # FMR: add in a built in canary test to ensure finding files and working
 # FMR: add functional tests
