@@ -548,7 +548,7 @@ function showdircountsinfile {
         $tempcntoutput = getdirfilecounts -Filename $OutputFile -Depth $ShowDirCounts
         if ($tempcntoutput.Count -gt 0) {
             "`nSummary counts of directories:`n" | Out-File -FilePath $TempSumDirCnt -Encoding UTF8
-            $tempcntoutput | Out-File -FilePath $TempSumDirCnt -Append -Encoding UTF8
+            $tempcntoutput | Sort-Object | Out-File -FilePath $TempSumDirCnt -Append -Encoding UTF8
             "`n" | Out-File -FilePath $TempSumDirCnt -Append -Encoding UTF8
         }
         else { "`nNo files to summarize counts of directories.`n" | Out-File -FilePath $TempSumDirCnt -Encoding UTF8 }
