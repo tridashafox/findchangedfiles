@@ -40,8 +40,8 @@ The script can search for different file types and provides these functions:
   
 ## Example script run
 
-![My diagram](example1.png)
-      --snip--
+<!-- ![My diagram](example1.png) -->
+  <!--     --snip-- -->
 
 ## Usage Notes
 
