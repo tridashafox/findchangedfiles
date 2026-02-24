@@ -161,6 +161,12 @@ function addtranslogtoutput {
 
     # Merge transcript + output
     $transContent  = Get-Content -Path $TransLog
+
+    # clean out VScode debugger noise which can appear when it tries to get vars for the var/watch window
+    if ($IsDebug) {
+        $transContent = $transContent | Where-Object { $_ -notmatch "^\(base\)|^>>" }
+    }
+
     $outputContent = Get-Content -Path $OutputFile
     $combined      = $transContent + @("") + $outputContent
     $combined | Set-Content -Path $OutputFile
@@ -246,7 +252,7 @@ function getFNinput {
     )
 
     if ($fnin.Length -eq 0 -or $ModDefault) {
-        if ($ModDefault -and $fnin.Length -gt 0) { $defval = $ScanFfninlterfn.ToLower() } else { $defval = 'none' }
+        if ($ModDefault -and $fnin.Length -gt 0) { $defval = $fnin.ToLower() } else { $defval = 'none' }
         while ($true) {
             $prtmsg += ": [default $defval]"
             $fnin = (Read-Host $prtmsg).ToLower().Trim()
@@ -565,12 +571,9 @@ function findfilestohighlight {
         [string]$fnsep,
         [string]$CopyMetaInfo,
         [string]$HighlightFilter,
-        [string]$HighlightFilterfn
+        [string]$HighlightFilterfn,
+        $filterhlpat
         )
-
-    # Get filter pattern if provided
-    $filterhlpat = @()
-    if ($HighlightFilter -ieq 'Y') { $filterhlpat = buildfilterarray -ExcludeFilelist $HighlightFilterfn }
 
     # build up list of files from raw file list of all files
     $filteredfiles = Get-Content -Path $unfall | Where-Object { $ExtsToHilight -contains [System.IO.Path]::GetExtension($_.Trim().Split()[-1]) }
@@ -675,9 +678,6 @@ function findfilestohighlight {
                             $counter++
                             $shouldSkip = $false
                             
-                            # exclude items from copy in match entry in filter
-                            #foreach ($excludeDdg in $filterhlpat) { if ($filename.Length -ge $excludeDdg.Length -and $filename.Substring(0, $excludeDdg.Length) -ieq $excludeDdg) { $shouldSkip = $true; $skippedcnt++; break } }
-
                             if (-not $shouldSkip) 
                             {
                                 # copy the file
@@ -778,11 +778,6 @@ function postprocess {
 
         $nonBlankLines = $filteredLines | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
         $cleanedLines = $nonBlankLines | Where-Object { $_ -notmatch '^Drive\s+[A-Z]:\\' }
-
-        # clean out VScode debugger noise which can appear when it tries to get vars for the var/watch window
-        if ($IsDebug) {
-            $cleanedLines = $cleanedLines | Where-Object { $_ -notmatch '^\(base\)|\^>>' }
-        }
         $lnsnum = $cleanedLines.Count
 
         # Output results
@@ -1129,6 +1124,7 @@ if ( $WhichDrive -ne 'ALL') { $drivestoscan = @($WhichDrive + ":") } else { $dri
 # TODO use the drive being scanned to filter out patterns not applicible in the buildfilter function
 # Build filter pattern 
 if ($FilterApp -eq 'Y') { $filterpatstr = buildfilterpatern -ExcludeFilelist $ScanFilterfn } else { $filterpatstr = "" }
+if ($HighlightFilter -ieq 'Y') { $filterhlpat = buildfilterarray -ExcludeFilelist $HighlightFilterfn } else { $filterhlpat = @() }
 
 # TODO: use checkfordebugger to see if it is running if so, switch to single threaded or give option
 # DBGNOTE: use this instead of Invoke-DriveScan to scan of just one drive (assumes ALL drives not specified). It does not run in seperarte tread, used to debug doScanFor so break points can be used
@@ -1149,7 +1145,7 @@ if ($copytodw -ieq 'Y' ) {
 # Highlight key file types which changed and copy them if requested
 $fndirsep = "-"
 if ( $ShowHighlights -ieq 'Y' ) { 
-    findfilestohighlight -outfile $OutputFile -unfall $TempUFAll -copytodw $CopyHighlights -copyrpterr $CopyReportErrors -resfolder $resfldpath -fnsep $fndirsep -CopyMetaInfo $CopyMetaInfo -HighlightFilter $HighlightFilter -HighlightFilterFn $HighlightFilterfn
+    findfilestohighlight -outfile $OutputFile -unfall $TempUFAll -copytodw $CopyHighlights -copyrpterr $CopyReportErrors -resfolder $resfldpath -fnsep $fndirsep -CopyMetaInfo $CopyMetaInfo -HighlightFilter $HighlightFilter -HighlightFilterFn $HighlightFilterfn -filterhlpat $filterhlpat
 }
 
 if (-not (Test-Path $OutputFile))  { Write-Host "No results found." }
