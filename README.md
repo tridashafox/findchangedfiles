@@ -49,7 +49,7 @@ The script will ask for all the options, or they can be passed as switches on th
 
 | Parameter          | Type   | Description                                                                                                                                                    | Default |
 | ------------------ | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
-| SingleThreaded     | string | Y means run process in single thread, useful for debugging. Only prompted for if debugger detected and not specified.                                          | N       |
+| SingleThreaded     | string | Y means run process in single thread, useful for debugging. Only prompted for if debugger detected and not specified. Defaults to Y if debugger otherwise N    | N       |
 | ModDefault         | string | Y means the below changes the default rather than passes the value.                                                                                            | N       |
 | CleanTempFiles     | string | Y to run Windows cleanmgr before running scan.                                                                                                                 | N       |
 | HoursToCheck       | double | Number of hours to look back for changes (e.g. -3 means last 3 hours, -0.5 means last half-hour). If positive, looks for changed files before specified hours. | -3      |
