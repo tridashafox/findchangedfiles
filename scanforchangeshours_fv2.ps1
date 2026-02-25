@@ -1,28 +1,100 @@
-# Checks for changes on all local drives since X hours have passed
-# Writen to be as fast as possible using multiple threads
-#
-# Useful for:
-#   Looking for a file that was saved but cannot find
-#   Looking for changes that have caused a problem on your system
-#   Looking for changes made by a virus or other rouge program
-#   Looking for posisble autosave/temp files after program crash to recover them
-#   Understanding what changed after an app install
-#
-# Allows option to specify a number of hours from now to look for changed files (negative number). E.g. -3 means look for any changed files in the last three hours.
-# Allows option to specify the number of hours after now to look for changed files (positive number). E.g. 3 means look for any changed up to three hours ago.
-# Number of hours can have a decimal point, e.g. -0.1 means look for files change in the last 6 minuntes.
-# Can just look for specific groups of file types, executibles EXE, images IMG or a specific extension type EXT.
-# Can just scan one specific drive or all drives
-# Can highlight changes to key files types which are important to look for changes (EXE, IMG)
-# Can use a scan filter to filter out directories should not be reported on
-# Can use a highlight copy filter to filter out directories from which highlighted files should not be copied
-# Note highlighting key files is a sperate processing but uses the same hours value
-# It produces a results file that is stored in a directory in user's download location
-# Filter input files are simple text files with a directory specified on each line
-# Note that this output directory, by default, will be included in later scans so delete when not required
-#
-# Only tested in powershell 5.1.26100.4652
-#
+<#
+.SYNOPSIS
+    Scans local drives for file changes within specified time window. Optimized for speed using multithreading.
+
+.DESCRIPTION
+    High-performance drive scanner designed to detect file modifications for troubleshooting, 
+    malware detection, crash recovery, and change analysis. Supports precise time windows 
+    (hours with decimals), file type filtering, size filtering, and directory exclusions.
+    
+    Use cases:
+    - Find recently saved/missing files
+    - Detect system changes causing problems  
+    - Identify virus/rogue program modifications
+    - Locate autosave/temp files after crashes
+    - Analyze app installation changes
+
+.PARAMETER SingleThreaded
+    Y = Run in single thread (debugging). Auto-prompts if debugger detected. Default: Y (debugger) / N (normal)
+
+.PARAMETER ModDefault
+    Y = Modifies defaults rather than passing values. Default: N
+
+.PARAMETER CleanTempFiles
+    Y = Run windows cleanmgr before scan. Default: N
+
+.PARAMETER HoursToCheck
+    Hours to look back for changes. Negative = since X hours ago (-3 = last 3hrs).
+    Positive = up to X hours ago (3 = changed before 3hrs ago). 
+    Supports decimals (-0.1 = last 6 minutes). Default: -3
+
+.PARAMETER WhichDrive
+    Specific drive (C) or ALL drives. Default: ALL
+
+.PARAMETER CheckFor
+    File types: ALL | IMG (images) | EXT (prompts for extension) | EXE (executables). Default: ALL
+
+.PARAMETER CheckForExt
+    Specific extension (no dot) when CheckFor=EXT. Default: EXE
+
+.PARAMETER CheckHidden
+    Y = Attempt to scan hidden files. Default: N
+
+.PARAMETER CheckForSizeMin
+    Minimum file size (bytes). Default: 0 (all files)
+
+.PARAMETER CheckForSizeMax
+    Maximum file size (bytes). -1 = no limit. Default: -1
+
+.PARAMETER FilterApp
+    Y = Apply directory exclusion filter during scan. Default: N
+
+.PARAMETER ScanFilterfn
+    Text file with one directory path per line to exclude from scan (when FilterApp=Y)
+
+.PARAMETER ShowDirCounts
+    Directory roll-up totals. 0=off, otherwise depth level. Default: 4
+
+.PARAMETER ShowHighlights
+    Y = List key changed files (EXE/IMG). Default: Y
+
+.PARAMETER CopyHighlights
+    Y = Copy highlighted files to Downloads temp folder. Default: N
+
+.PARAMETER HighlightFilter
+    Y = Apply exclusion filter to highlighted files. Default: N
+
+.PARAMETER HighlightFilterfn
+    Text file with directories to exclude from highlight copy (when HighlightFilter=Y)
+
+.PARAMETER CopyMetaInfo
+    Y = Create JSON metadata file for copied highlights. Default: N
+
+.PARAMETER CopyReportErrors
+    Y = Log highlight copy errors to results. Default: N
+
+.PARAMETER FilterZeroLenFiles
+    Y = Exclude zero-byte files from results. Default: Y
+
+.EXAMPLE
+    .\Scan-Drives.ps1 -HoursToCheck -2 -WhichDrive C -CheckFor EXE
+    # Scan C: drive for EXEs changed in last 2 hours
+
+.EXAMPLE
+    .\Scan-Drives.ps1 -HoursToCheck -0.5 -CheckFor IMG
+    # Find images changed in last 30 minutes across all drives
+
+.EXAMPLE
+    Get-Help .\Scan-Drives.ps1 -Full
+    # Show complete help
+
+.EXAMPLE
+    .\Scan-Drives.ps1 -HoursToCheck 24 -FilterApp Y -ScanFilterfn exclude.txt
+    # Scan files changed before 24hrs ago, excluding dirs in exclude.txt
+
+.NOTES
+    Tested: PowerShell 5.1.26100.4652
+#>
 
 # TODO
 # BUG: fix hang in powershell 7.x
