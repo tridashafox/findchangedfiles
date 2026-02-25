@@ -36,7 +36,7 @@ The script can search for different file types and provides these functions:
 
 5. **Directory Count Summary**
    
-   A total of changed files is rolled up into a total for a directory path with a specified depth.
+   A total of changed files is rolled up for a directory path with a specified depth.
   
 <!-- ## Example script run -->
 
@@ -47,26 +47,27 @@ The script can search for different file types and provides these functions:
 
 The script will ask for all the options, or they can be passed as switches on the command line. They are:
 
-| Parameter         | Type   | Description                                                                                                                                                    | Default |
-| ----------------- | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
-| ModDefault        | string | Y means the below changes the default rather than passes the value.                                                                                            | N       |
-| CleanTempFiles    | string | Y to run Windows cleanmgr before running scan.                                                                                                                 | N       |
-| HoursToCheck      | double | Number of hours to look back for changes (e.g. -3 means last 3 hours, -0.5 means last half-hour). If positive, looks for changed files before specified hours. | -3      |
-| WhichDrive        | string | Drive to scan, or ‘ALL’ for all drives.                                                                                                                        | ALL     |
-| CheckFor          | string | Which types of files to check: ALL, IMG (images), EXT (specific extension), EXE (executables).                                                                 | ALL     |
-| CheckForExt       | string | Specific extension to scan for (without the .). Used when CheckFor = EXT.                                                                                      | EXE     |
-| CheckHidden       | string | Y to include hidden files in the scan.                                                                                                                         | N       |
-| CheckForSizeMin   | int    | Include files above this minimum size (in bytes).                                                                                                              | 0       |
-| CheckForSizeMax   | int    | Include files below this maximum size (in bytes). Use -1 for no limit.                                                                                         | -1      |
-| FilterApp         | string | Y to apply a filter that excludes certain directories from scan results.                                                                                       | N       |
-| ScanFilterfn      | string | File name containing a list of directories to exclude during scanning (used when FilterApp = Y).                                                               | —       |
-| ShowDirCounts     | int    | Shows a roll up total of found files by directory. 0 - don't show, otherwise depth to use for roll up.                                                         | 4       |
-| ShowHighlights    | string | Y to list key file types that changed.                                                                                                                         | Y       |
-| CopyHighlights    | string | Y to copy highlighted files to a temporary directory in Downloads.                                                                                             | N       |
-| HighlightFilter   | string | Y to apply a filter excluding certain directories from highlighted files.                                                                                      | N       |
-| HighlightFilterfn | string | File name with list of directories to exclude from highlighted results.                                                                                        | —       |
-| CopyMetaInfo      | string | Y to create a JSON file with metadata for each highlighted file.                                                                                               | N       |
-| CopyReportErrors  | string | Y to log errors during ShowHighlights into the results file.                                                                                                   | N       |
+| Parameter          | Type   | Description                                                                                                                                                    | Default |
+| ------------------ | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
+| ModDefault         | string | Y means the below changes the default rather than passes the value.                                                                                            | N       |
+| CleanTempFiles     | string | Y to run Windows cleanmgr before running scan.                                                                                                                 | N       |
+| HoursToCheck       | double | Number of hours to look back for changes (e.g. -3 means last 3 hours, -0.5 means last half-hour). If positive, looks for changed files before specified hours. | -3      |
+| WhichDrive         | string | Drive to scan, or ‘ALL’ for all drives.                                                                                                                        | ALL     |
+| CheckFor           | string | Which types of files to check: ALL, IMG (images), EXT (specific extension), EXE (executables).                                                                 | ALL     |
+| CheckForExt        | string | Specific extension to scan for (without the .). Used when CheckFor = EXT.                                                                                      | EXE     |
+| CheckHidden        | string | Y to include hidden files in the scan.                                                                                                                         | N       |
+| CheckForSizeMin    | int    | Include files above this minimum size (in bytes).                                                                                                              | 0       |
+| CheckForSizeMax    | int    | Include files below this maximum size (in bytes). Use -1 for no limit.                                                                                         | -1      |
+| FilterApp          | string | Y to apply a filter that excludes certain directories from scan results.                                                                                       | N       |
+| ScanFilterfn       | string | File name containing a list of directories to exclude during scanning (used when FilterApp = Y).                                                               | —       |
+| ShowDirCounts      | int    | Shows a roll up total of found files by directory. 0 - don't show, otherwise depth to use for roll up.                                                         | 4       |
+| ShowHighlights     | string | Y to list key file types that changed.                                                                                                                         | Y       |
+| CopyHighlights     | string | Y to copy highlighted files to a temporary directory in Downloads.                                                                                             | N       |
+| HighlightFilter    | string | Y to apply a filter excluding certain directories from highlighted files.                                                                                      | N       |
+| HighlightFilterfn  | string | File name with list of directories to exclude from highlighted results.                                                                                        | —       |
+| CopyMetaInfo       | string | Y to create a JSON file with metadata for each highlighted file.                                                                                               | N       |
+| CopyReportErrors   | string | Y to log errors during ShowHighlights into the results file.                                                                                                   | N       |
+| FilterZeroLenFiles | string | Y to filter out zero length files.                                                                                                                             | Y       |
 
 `File groups` are sets of extensions not an actual extensions
 | Parameter | Extensions  |
@@ -76,13 +77,13 @@ The script will ask for all the options, or they can be passed as switches on th
 | `EXE`     | BAT, PS1, BIN, CMD, COM, CPL, EXE, GADGET, INF1, INS, INX, ISU, JOB, JSE, LNK, MSC, MSI, MSP, MST, PAF, PIF, PS1, REG, RGS, SCR, SCT, SHB, SHS, U3P, VB, VBE, VBS, VBSCRIPT, WS, WSF, WSH |
 | `EXT`     | A single extension to look for as defined in `CheckForExt`. Do not include the `'.'` prefix when specifing  `CheckForExt`. |
 
-### Example 1 - will run with no prompting
+### Example 1 - find all files changed in last 3 hours (no highlited files, no directory roll up counts). Will run without promptin.
 
-`powershell -File "scanforchangeshours_fv2.ps1" -CleanTempFiles N -HoursToCheck -3 -WhichDrive ALL -CheckFor ALL -CheckHidden Y -CheckForSizeMin 0 -CheckForSizeMax -1 -FilterApp N -ShowDirCounts 0 -ShowHighlights Y -HighlightFilter N -CopyHighlights N -CopyMetaInfo N -CopyReportErrors N`
+`powershell -File "scanforchangeshours_fv2.ps1" -CleanTempFiles N -HoursToCheck -3 -WhichDrive ALL -CheckFor ALL -CheckHidden Y -CheckForSizeMin 0 -CheckForSizeMax -1 -FilterApp N -ShowDirCounts 0 -ShowHighlights Y -HighlightFilter N -CopyHighlights N -CopyMetaInfo N -CopyReportErrors N -FilterZeroLenFiles Y`
 
 ### Example 2 - run with prompting but change one of the defaults
 
-`powershell -File "scanforchangeshours_fv2.ps1" -ModDefault Y -CheckFor IMG `
+`powershell -File "scanforchangeshours_fv2.ps1" -ModDefault Y -CheckFor EXE `
 
 ### Beware
 
