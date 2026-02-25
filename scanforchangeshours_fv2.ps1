@@ -14,7 +14,7 @@
     - Locate autosave/temp files after crashes
     - Analyze app installation changes
 
-    Lists of directories to filter out in both the scan and the copy operation can be provided in a .txt file with one directory listed per line. Use trailing '\' for exact match or omit this for part match.
+    Lists of directories to filter out in both the scan and the copy operation can be provided in a .txt file with one directory listed per line. Use trailling '\' for exact match or omit this for part match.
 
 .PARAMETER SingleThreaded
     Y = Run in single thread (debugging). Auto-prompts if debugger detected. Default: Y (debugger) / N (normal)
@@ -78,6 +78,12 @@
 .PARAMETER FilterZeroLenFiles
     Y = Exclude zero-byte files from results. Default: Y
 
+.INPUTS
+    Drive(s) and how for back in hours to look for changes, filtering options, if highlighted files should be copied or filtered.
+
+.OUTPUTS
+    Result file stored in a created directory with name sfc-<date>-<time> in the downloads directory. If copy highlighted files enabled, files also copied into this directory.
+
 .EXAMPLE
     powershell -File "scanforchangeshours_fv2.ps1" -CleanTempFiles N -HoursToCheck -3 -WhichDrive ALL -CheckFor ALL -CheckHidden Y -CheckForSizeMin 0 -CheckForSizeMax -1 -FilterApp N -ShowDirCounts 0 -ShowHighlights Y -HighlightFilter N -CopyHighlights N -CopyMetaInfo N -CopyReportErrors N -FilterZeroLenFiles Y
     # find all files changed in last 3 hours (no highlited files, no directory roll up counts). Will run without prompting.
@@ -89,6 +95,9 @@
 .EXAMPLE
     Get-Help scanforchangeshours_fv2.ps1 -Full
     # Show complete help
+
+.LINK
+    https://github.com/tridashafox/findchangedfiles.git
 
 .NOTES
     Version: 1.1.0
