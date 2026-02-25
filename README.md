@@ -36,7 +36,7 @@ The script can search for different file types and provides these functions:
 
 5. **Directory Count Summary**
    
-   A total of changed files is rolled up into a total for a directory path with a specified depth.
+   A total of changed files is rolled up for a directory path with a specified depth.
   
 <!-- ## Example script run -->
 
