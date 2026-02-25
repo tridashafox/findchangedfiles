@@ -113,8 +113,6 @@
 # FMR: use the drive being scanned to filter out patterns not applicible in the buildfilter function
 # FMR: move extension lists into function near buildfilters
 # FMR: allow a directory to be scanned rather than just a drive
-# FMR: full review and code cleanup
-# FMR: consider adding result analysis tools
 # FMR: add in a built in canary test to ensure finding files and working
 # FMR: add functional tests
 
@@ -346,7 +344,6 @@ function getFNinput {
     return $fnin
 }
 
-
 ########################################################################
 # Parse results file and display a summary of file counts in directories
 # NOTE will fail if any of the formating of the output is changed
@@ -411,7 +408,7 @@ function getdirfilecounts {
     $dirCounts.GetEnumerator() | Sort-Object Name | ForEach-Object {
         $count = $_.Value
         $directory = $_.Name
-        $countStr = $count.ToString("D5")  # D6 = 6 digits, right-aligned with spaces
+        $countStr = $count.ToString("D5")  # D5 = 5 digits right-aligned with spaces
         Write-Output "$countStr  $directory"
     }
 }
@@ -430,7 +427,7 @@ function watchjobprogress {
 
     # Write does not output to transcript log
     # Transcript logs can't handle Write-Host "." -NoNewline
-    # We don't want this in the log anway so use the .net framework Write
+    # We don't want this in the log anyway so use the .net framework Write
     [Console]::Write("Processing scan in $jobcnt parallel jobs:")  
 
     while ($jobcnt -gt 0) {
@@ -601,16 +598,6 @@ function buildfilterarray {
 
     if ($textfilterarr.Count -eq 0) { Write-Host "[Warning] Filter file '$ExcludeFilelist' does not exist or contains no entries." -ForegroundColor Yellow}
 
-    <#
-    # For DEBUGGING & - creates a scoped block
-    &{
-        # dump the filter txt to dowloads dir
-        $dwdir = (New-Object -ComObject Shell.Application).NameSpace('shell:Downloads').Self.Path
-        $dboutfn = $dwdir + "\sfc_debug_filter.txt"
-        $textfilterpat | Add-Content -Path $dboutfn
-    } 
-    #>
-    
     return $textfilterarr
 }
 
@@ -1042,20 +1029,7 @@ if ($IsDebug) {
 # Options: Use run cleaner option
 $CleanTempFiles = getYNinput $ModDefault $CleanTempFiles "CleanTempFiles" "Use Windows (cleanmgr.exe) to clean temp files before looking for changes?" "N"
 
-# Options: Get hours back to scan, must be negative
-<# Note below $HoursToCheck -eq $null rather than !$HoursToCheck, for strings this works as even an empty string is not false. But for numbers zero is false, so need to check for $null
-   This is a core issue of untyped language: 
-
-    function launchrocket {
-        param ( $cmdinstr )
-        if ($cmdinstr) { "count down and launch rocket" }
-    }
-    
-    launchrocket -cmdinstr $a 
-    launchrocket -cmdinstr [int]a$ 
-    
-    For the same value and logic a change of type changes the behavior. 
-#>
+# Options: Get hours back to scan
 if ($HoursToCheck -eq 0 -or $ModDefault) {
     if ($ModDefault -and $HoursToCheck -ne 0) { $defval = $HoursToCheck } else { $defval = -3}
     $invvuhr = $true
@@ -1106,7 +1080,6 @@ if ($CheckFor -eq 'EXT') {
 $CheckHidden = getYNinput $ModDefault $CheckHidden "CheckHidden" "Look for hidden files? (NB: If Y will be slower due to access errors)" 'N'
 
 # Options: Size
-# debuger sets uninitialised values to 0, while if run from cmd line it is set to $null, so can't use $null to see if specified.
 if (-not $PSBoundParameters.ContainsKey('CheckForSizeMin') -or $ModDefault) { 
     if ($ModDefault -and $CheckForSizeMin) { $defval = $CheckForSizeMin } else { $defval = '0' }
     $CheckForSizeMin = Read-Host "Look only for files that are larger than n bytes?: [default $defval]" 
@@ -1163,7 +1136,7 @@ if ( $cleantempfiles -ieq 'Y' ) {
     Write-Host "Cleaning done."
 }
 
-# Message to say what the scan will be doing
+# Messages to say what the scan will be doing
 if ($HoursToCheck -lt 0) { 
     $hoursago = (Get-Date).AddHours($HoursToCheck) 
     $hrdirection = "after";
@@ -1215,11 +1188,10 @@ if ($FilterApp -eq 'Y')          { $filterpatstr = buildfilterpatern -ExcludeFil
 if ($FilterZeroLenFiles -eq 'Y') { $filterpatstr = buildfilterpatZfn -Filterpat $filterpatstr }
 if ($HighlightFilter -ieq 'Y')   { $filterhlpat  = buildfilterarray -ExcludeFilelist $HighlightFilterfn } else { $filterhlpat = @() }
 
-# Do the scan
+# Do the scan, single or multi-threaded
 if ($SingleThreaded -eq 'Y') {
     Invoke-DriveScan -Drives $drivestoscan -OutputFile $OutputFile -hourdirection $hrdirection -hoursago $hoursago -FilterApp $FilterApp -CheckFor $CheckFor -CheckForExt $CheckForExt -TempUFAll $TempUFAll -CheckForSizeMin $CheckForSizeMin -CheckForSizeMax $CheckForSizeMax -CheckHidden $CheckHidden -ScanFilterfn $ScanFilterfn -FilterPat $filterpatstr 
 } else {
-    # Do the scan and get the results with multiple threads to improve time taken
     Invoke-DriveScanMT -Drives $drivestoscan -OutputFile $OutputFile -hourdirection $hrdirection -hoursago $hoursago -FilterApp $FilterApp -CheckFor $CheckFor -CheckForExt $CheckForExt -TempUFAll $TempUFAll -CheckForSizeMin $CheckForSizeMin -CheckForSizeMax $CheckForSizeMax -CheckHidden $CheckHidden -ScanFilterfn $ScanFilterfn -FilterPat $filterpatstr 
 }
 
