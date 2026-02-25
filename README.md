@@ -67,7 +67,7 @@ The script will ask for all the options, or they can be passed as switches on th
 | HighlightFilterfn  | string | File name with list of directories to exclude from highlighted results.                                                                                        | —       |
 | CopyMetaInfo       | string | Y to create a JSON file with metadata for each highlighted file.                                                                                               | N       |
 | CopyReportErrors   | string | Y to log errors during ShowHighlights into the results file.                                                                                                   | N       |
-| FilterZeroLenFiles | string | Y to filter out zero lenght files.                                                                                                                             | Y       |
+| FilterZeroLenFiles | string | Y to filter out zero length files.                                                                                                                             | Y       |
 
 `File groups` are sets of extensions not an actual extensions
 | Parameter | Extensions  |
