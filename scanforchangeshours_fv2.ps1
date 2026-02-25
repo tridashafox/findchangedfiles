@@ -8,11 +8,13 @@
     (hours with decimals), file type filtering, size filtering, and directory exclusions.
     
     Use cases:
-    - Find recently saved/missing files
+    - Find recently saved/missing/copied files
     - Detect system changes causing problems  
     - Identify virus/rogue program modifications
     - Locate autosave/temp files after crashes
     - Analyze app installation changes
+
+    Lists of directories to filter out in both the scan and the copy operation can be provided in a .txt file with one directory listed per line. Use trailing '\' for exact match or omit this for part match.
 
 .PARAMETER SingleThreaded
     Y = Run in single thread (debugging). Auto-prompts if debugger detected. Default: Y (debugger) / N (normal)
@@ -29,7 +31,7 @@
     Supports decimals (-0.1 = last 6 minutes). Default: -3
 
 .PARAMETER WhichDrive
-    Specific drive (C) or ALL drives. Default: ALL
+    A specific drive e.g. C or ALL drives. Default: ALL
 
 .PARAMETER CheckFor
     File types: ALL | IMG (images) | EXT (prompts for extension) | EXE (executables). Default: ALL
@@ -77,22 +79,20 @@
     Y = Exclude zero-byte files from results. Default: Y
 
 .EXAMPLE
-    .\Scan-Drives.ps1 -HoursToCheck -2 -WhichDrive C -CheckFor EXE
-    # Scan C: drive for EXEs changed in last 2 hours
+    powershell -File "scanforchangeshours_fv2.ps1" -CleanTempFiles N -HoursToCheck -3 -WhichDrive ALL -CheckFor ALL -CheckHidden Y -CheckForSizeMin 0 -CheckForSizeMax -1 -FilterApp N -ShowDirCounts 0 -ShowHighlights Y -HighlightFilter N -CopyHighlights N -CopyMetaInfo N -CopyReportErrors N -FilterZeroLenFiles Y
+    # find all files changed in last 3 hours (no highlited files, no directory roll up counts). Will run without prompting.
 
 .EXAMPLE
-    .\Scan-Drives.ps1 -HoursToCheck -0.5 -CheckFor IMG
-    # Find images changed in last 30 minutes across all drives
+    powershell -File "scanforchangeshours_fv2.ps1" -ModDefault Y -CheckFor EXE 
+    # run with prompting but change one of the defaults
 
 .EXAMPLE
-    Get-Help .\Scan-Drives.ps1 -Full
+    Get-Help scanforchangeshours_fv2.ps1 -Full
     # Show complete help
 
-.EXAMPLE
-    .\Scan-Drives.ps1 -HoursToCheck 24 -FilterApp Y -ScanFilterfn exclude.txt
-    # Scan files changed before 24hrs ago, excluding dirs in exclude.txt
-
 .NOTES
+    Version: 1.1.0
+    GitHub: https://github.com/tridashafox/findchangedfiles.git
     Tested: PowerShell 5.1.26100.4652
 #>
 
