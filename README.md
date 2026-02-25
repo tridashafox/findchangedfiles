@@ -49,6 +49,7 @@ The script will ask for all the options, or they can be passed as switches on th
 
 | Parameter          | Type   | Description                                                                                                                                                    | Default |
 | ------------------ | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
+| SingleThreaded     | string | Y means run process in single thread, useful for debugging. Only prompted for if debugger detected and not specified. Defaults to Y if debugger otherwise N    | N       |
 | ModDefault         | string | Y means the below changes the default rather than passes the value.                                                                                            | N       |
 | CleanTempFiles     | string | Y to run Windows cleanmgr before running scan.                                                                                                                 | N       |
 | HoursToCheck       | double | Number of hours to look back for changes (e.g. -3 means last 3 hours, -0.5 means last half-hour). If positive, looks for changed files before specified hours. | -3      |
@@ -85,7 +86,7 @@ The script will ask for all the options, or they can be passed as switches on th
 
 `powershell -File "scanforchangeshours_fv2.ps1" -ModDefault Y -CheckFor EXE `
 
-### Beware
+### Notes
 
 > After Win11 H2 update, PowerShell scripts may not run by default.  
 > You must open a PowerShell terminal to run scripts with bypassed execution policy, or use a batch file or Visual Studio Code.
@@ -93,7 +94,6 @@ The script will ask for all the options, or they can be passed as switches on th
 ```
 powershell -ExecutionPolicy ByPass -File scanforchangeshours_fv2.ps1
 ```
-### Additional Notes
 
 - **Processing Hidden Files:** Script can be up to 3x slower when including hidden files, especially if not running as admin (access denied errors).
 - **Result Folders:** If you run the script multiple times without deleting previous results, the output may be scanned again. This is intentional.
