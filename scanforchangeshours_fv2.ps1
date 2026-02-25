@@ -21,18 +21,12 @@
 # Filter input files are simple text files with a directory specified on each line
 # Note that this output directory, by default, will be included in later scans so delete when not required
 #
-# Run it in a powershell terminal using command: powershell -ExecutionPolicy ByPass -File .\scanforchangeshours_fv2.ps1
-# or from within VScode
-# 
 # Only tested in powershell 5.1.26100.4652
 #
 
 # TODO
-# update readme.md
 # BUG: fix hang in powershell 7.x
 # FMR: use the drive being scanned to filter out patterns not applicible in the buildfilter function
-# FRM: use checkfordebugger to see if it is running if so, give option to switch to single threaded
-# FRM: add an option not to remove zero length files from the scan results 
 # FMR: move extension lists into function near buildfilters
 # FMR: allow a directory to be scanned rather than just a drive
 # FMR: full review and code cleanup
@@ -41,24 +35,26 @@
 # FMR: add functional tests
 
 param (
+    [string]$SingleThreaded,       # Y means run process in single thread, useful for debugging. Only prompted for if debugger detected and not specified. Default is Y
     [string]$ModDefault,           # Y means the below changes the default rather than passes the value, default is N
     [string]$CleanTempFiles,       # Y if want to run windows cleanmgr before running scan, default is N
     [double]$HoursToCheck,         # Number of hours to look back for changes, default is -3, note this can have a decimal point e.g. -0.5 (last half-hour). If postive looks for changed files before specified hours.
     [string]$WhichDrive,           # Which drive to scan, or all drives, default is ALL
     [string]$CheckFor,             # Which types of files to check for, can be  is ALL, IMG (anything at is an Image), EXT (askes for an CheckForExt), EXE (anything that executes), default is ALL
     [string]$CheckForExt,          # A specific extension to scan for (don't include the '.' before the extension), default EXE. Ignored unless CheckFor is EXT
-    [string]$CheckHidden,          # Y if want to try to scan hidden files, default is 'N'
+    [string]$CheckHidden,          # Y if want to try to scan hidden files, default is N
     [int]$CheckForSizeMin,         # Include files above this min size, default is 0 (all files)
     [int]$CheckForSizeMax,         # Include files blow this max size, default is -1 (all files)
     [string]$FilterApp,            # Y means apply filter to the scan to not report on specific directories.
-    [string]$ScanFilterfn,         # Name of a file which contains a list of directories which should not be checked for changes if FilterApp is 'Y'
+    [string]$ScanFilterfn,         # Name of a file which contains a list of directories which should not be checked for changes if FilterApp is Y
     [int]$ShowDirCounts,           # Shows a roll up total of found items by directory. 0 - don't show, otherwise depth to use for roll up, default is 4
-    [string]$ShowHighlights,       # Look for key file types that changed and list them out, default is 'Y'
-    [string]$CopyHighlights,       # Copy files found by ShowHighlights to a temp directory in downloads, default is 'N'
+    [string]$ShowHighlights,       # Look for key file types that changed and list them out, default is Y
+    [string]$CopyHighlights,       # Copy files found by ShowHighlights to a temp directory in downloads, default is N
     [string]$HighlightFilter,      # Y means apply filter to the highlighted files from specific directories.
     [string]$HighlightFilterfn,    # Name of a file which contains a list of directories from which highlighted files excluded
-    [string]$CopyMetaInfo,         # Create a json file with info about for each file found by ShowHighlights, default is 'N'
-    [string]$CopyReportErrors      # Report errors during the ShowHighlights operation into the results file, default is 'N'
+    [string]$CopyMetaInfo,         # Create a json file with info about for each file found by ShowHighlights, default is N
+    [string]$CopyReportErrors,     # Report errors during the ShowHighlights operation into the results file, default is N
+    [string]$FilterZeroLenFiles    # Filter out zero length files from the result, default is Y
 )
 
 ########################################################################
@@ -123,7 +119,8 @@ function showscanduration {
         $duration = $Result.EndT - $Result.StartT
         #$middur = $Result.MidT - $Result.StartT
         #Write-Host $middur, $duration, $Result.Path
-        Write-Host "Time taken:", $duration, $Result.Path
+        $durStr = $duration.TotalSeconds.ToString("N3")
+        "Time taken: $($Result.Path) $durStr"
     }
 }
 
@@ -468,7 +465,8 @@ function doScanfor {
 #
 function buildfilterpatern { 
     param (
-        [string]$ExcludeFilelist
+        [string]$ExcludeFilelist,
+        [string]$FilterZeroLenfn 
     )
 
     $textfilterpat = ""
@@ -487,23 +485,21 @@ function buildfilterpatern {
 
     if ($textfilterpat.Count -eq 0 -or $textfilterpat.Length -eq 0) { Write-Host "[Warning] Filter file '$ExcludeFilelist' does not exist or contains no entries." -ForegroundColor Yellow}
 
-    #  on all drives which need filtering for zero lenght files (TODO: make this an option)
-    $drives = Get-CimInstance -ClassName Win32_LogicalDisk -Filter "DriveType=3" | ForEach-Object { "$($_.DeviceID)" }
-    foreach ($drive in $drives) {
-        $textfilterpat += "  0 " + $drive[0]+ ":\\"+ $patsp # filter out zero lenght files, special case
-    }
-
-    <#
-    # For DEBUGGING & - creates a scoped block
-    &{
-        # dump the filter txt to dowloads dir
-        $dwdir = (New-Object -ComObject Shell.Application).NameSpace('shell:Downloads').Self.Path
-        $dboutfn = $dwdir + "\sfc_debug_filter.txt"
-        $textfilterpat | Add-Content -Path $dboutfn
-    } 
-    #>
-    
     return $textfilterpat
+}
+
+########################################################################
+# add to passed pattern filtering for zero lenght files 
+#
+function buildfilterpatZfn {
+    param ( 
+        $Filterpat 
+    )
+
+    $drives = Get-CimInstance -ClassName Win32_LogicalDisk -Filter "DriveType=3" | ForEach-Object { "$($_.DeviceID)" }
+    foreach ($drive in $drives) { $Filterpat += "  0 " + $drive[0]+ ":\\|"}
+
+    return $Filterpat
 }
 
 ########################################################################
@@ -791,12 +787,11 @@ function postprocess {
 }
 
 ########################################################################
-# do the scan of single drive without threads
-# only used for debugging
+# do the scan of  drive without threads
 #
-function Invoke-SingleDriveScan {
+function Invoke-DriveScan {
     param (
-        [Parameter(Mandatory=$true)][string]$WhichDrive,
+        [Parameter(Mandatory=$true)][string[]]$Drives,
         [string]$hourdirection,
         [datetime]$hoursago,
         $FilterApp,
@@ -811,31 +806,26 @@ function Invoke-SingleDriveScan {
         $FilterPat
     )
 
-    # Scans one drive at a time so drive must be a single letter and not ALL
-    if ($WhichDrive.Length -gt 1) { Write-Host "[Error] Invalid drive letter '$WhichDrive' passed to function Invoke-SingleDriveScan.`n" -ForegroundColor Red; waitbeforeexit}
+    Write-Host "Scanning Drive(s)" $Drives "..."
+    $durres = @()
+    foreach ($drive in $Drives) {
+        $TempFileX = New-TemporaryFile
+        $result = doScanfor -drive $($drive[0] + ":\") -outfile $TempFileX -hrdir $hourdirection -hago $hoursago -dofilter $FilterApp -filterpatstr $FilterPat -exttochk $CheckFor -exttochkact $CheckForExt -unfall $TempUFAll -minSize $CheckForSizeMin -maxSize $CheckForSizeMax -checkforcehidden $CheckHidden -brootonly $false
+        $durres += showscanduration -Result $result
 
-    $TempFileX = New-TemporaryFile
-    $temploc = $WhichDrive + ":\"
+        $txtfilterpat = $OutputFile.Replace("\", "\\") + "|" + $TempFileX.FullName.Replace("\", "\\") + "|" + $TempUFAll.FullName.Replace("\", "\\")
+        postprocess -drivelet $drive[0] -infile $TempFileX -namefilter $txtfilterpat -outfile $OutputFile
 
-    $result = doScanfor -drive $temploc -outfile $TempFileX -hrdir $hourdirection -hago $hoursago -dofilter $FilterApp -filterpatstr $FilterPat -exttochk $CheckFor -exttochkact $CheckForExt -unfall $TempUFAll -minSize $CheckForSizeMin -maxSize $CheckForSizeMax -checkforcehidden $CheckHidden -brootonly $false
-    showscanduration -Result $result
-
-    $txtfilterpat = $OutputFile.Replace("\", "\\") + "|" +`
-        $TempFileX.FullName.Replace("\", "\\") + "|" +`
-        $TempUFAll.FullName.Replace("\", "\\")
-
-    postprocess -drivelet $WhichDrive -infile $TempFileX -namefilter $txtfilterpat -outfile $OutputFile
-
-    if (Test-Path $TempFileX) {
-        Remove-Item $TempFileX -Force
+        if (Test-Path $TempFileX) { Remove-Item $TempFileX -Force }
     }
+    $durres | ForEach-Object { $_ }
 }
 
 ########################################################################
 # do the scan of a set of drives using threads
 # TODO: Hangs in powershell 7.x 
 #
-function Invoke-DriveScan {
+function Invoke-DriveScanMT {
     param (
         [Parameter(Mandatory=$true)][string[]]$Drives,
         [string]$hourdirection,
@@ -895,7 +885,7 @@ function Invoke-DriveScan {
     Write-Host "`n`[INFO] Scan timings..." -ForegroundColor Green
     foreach ($job in $jobs) {
         $result = Receive-Job $job
-        showscanduration -Result $result
+        Write-Host $(showscanduration -Result $result)
     }
     Write-Host ""
 
@@ -957,6 +947,13 @@ $OutputFile = $dwdir + "\result.txt"
 $ExtsToHilight = @(".exe", ".bat", ".pdf", ".jpg", ".png", ".gif", ".ico", ".docx", ".mp4", ".tif", ".tiff", ".webm", ".webp", ".afphoto", ".psd", ".pic", ".jpeg")
 if ($ModDefault -eq "" -or $ModDefault -eq "N") { $ModDefault = $null}
 clearpressedkeys
+
+# Options: run in single thread
+if ($IsDebug) { 
+    $SingleThreaded = getYNinput $ModDefault $SingleThreaded "SingleThreaded" "Run in single thread?" "Y" 
+} elseif (-not $PSBoundParameters.ContainsKey('SingleThreaded')) {
+    $SingleThreaded = 'N'
+}
 
 # Options: Use run cleaner option
 $CleanTempFiles = getYNinput $ModDefault $CleanTempFiles "CleanTempFiles" "Use Windows (cleanmgr.exe) to clean temp files before looking for changes?" "N"
@@ -1068,6 +1065,9 @@ if ($ShowHighlights -ieq 'Y') {
     $HighlightFilter = 'N'
 }
 
+#Options: Filter zero length files
+$FilterZeroLenFiles = getYNinput $ModDefault $FilterZeroLenFiles "FilterZeroLenFiles" "Filter out zero length files from the result?" 'Y'
+
 # Start a transaction log so it can be included in the output file for later reference
 $TransLog = New-TemporaryFile
 Start-Transcript -Path $TransLog -Append | Out-Null
@@ -1088,6 +1088,7 @@ if ($HoursToCheck -lt 0) {
     $hrdirection = "before";
 }
 
+$msgsng = if ($SingleThreaded -eq 'Y') {"(single threaded)"} else {""}
 $msghid = if ($CheckHidden -eq 'Y') { "including hidden files" } else { "excluding hidden files" }
 $maxmsg = if ($CheckForSizeMax -eq '-1') { "no maximum size" } else { "maximum size $CheckForSizeMax bytes" }
 $msgflt = if ($FilterApp -eq 'Y') { "filter applied using $ScanFilterfn" } else { "no filter applied" }
@@ -1096,15 +1097,17 @@ $metaCt = if ($CopyMetaInfo -eq 'Y') { "will be created" } else { "will not be c
 $msgchi = if ($CopyHighlights -eq 'Y') { "and will be copied to an output directory"} else { "only" }
 $msgext = if ($CheckFor -eq 'EXT') { "Extension .$CheckForExt" } else { "" }
 $msgflc = if ($HighlightFilter -eq 'Y') { "filter applied using $HighlightFilterFn" } else { "no filter applied" }
+$msgzfn = if ($FilterZeroLenFiles -eq 'Y') {"yes"} else {"no"}
 
-Write-Host "`n[INFO] Scanning using values..." -ForegroundColor Green
-if ($WhichDrive -eq 'ALL') { Write-Host " - Drives: $Drives" } else { Write-Host " - Drives:" $WhichDrive}
+Write-Host "`n[INFO] Scanning using values" -ForegroundColor Green
+if ($WhichDrive -eq 'ALL') { Write-Host " - Drives: $Drives $msgsng" } else { Write-Host " - Drives: $WhichDrive $msgsng"}
 Write-Host " - Look for files modified $hrdirection $hoursago"
 Write-Host " - File types: $CheckFor" $msgext
 Write-Host " - Hidden files: $msghid"
 Write-Host " - File size between: $CheckForSizeMin bytes and $maxmsg"
 Write-Host " - Filter scan: $msgflt"
 Write-Host " - Directory summary counts: $msgdcs"
+Write-Host " - Filtering zero length files: $msgzfn"
 
 if ($ShowHighlights -eq 'Y') {
     Write-Host "`n[INFO] Highlighting enabled..." -ForegroundColor Green
@@ -1124,15 +1127,17 @@ if ( $WhichDrive -ne 'ALL') { $drivestoscan = @($WhichDrive + ":") } else { $dri
 
 # TODO use the drive being scanned to filter out patterns not applicible in the buildfilter function
 # Build filter pattern 
-if ($FilterApp -eq 'Y') { $filterpatstr = buildfilterpatern -ExcludeFilelist $ScanFilterfn } else { $filterpatstr = "" }
-if ($HighlightFilter -ieq 'Y') { $filterhlpat = buildfilterarray -ExcludeFilelist $HighlightFilterfn } else { $filterhlpat = @() }
+if ($FilterApp -eq 'Y')          { $filterpatstr = buildfilterpatern -ExcludeFilelist $ScanFilterfn -FilterZeroLenfn $FilterZeroLenFiles } else { $filterpatstr = "" }
+if ($FilterZeroLenFiles -eq 'Y') { $filterpatstr = buildfilterpatZfn -Filterpat $filterpatstr }
+if ($HighlightFilter -ieq 'Y')   { $filterhlpat  = buildfilterarray -ExcludeFilelist $HighlightFilterfn } else { $filterhlpat = @() }
 
-# TODO: use checkfordebugger to see if it is running if so, switch to single threaded or give option
-# DBGNOTE: use this instead of Invoke-DriveScan to scan of just one drive (assumes ALL drives not specified). It does not run in seperarte tread, used to debug doScanFor so break points can be used
-# Invoke-SingleDriveScan -WhichDrive $WhichDrive -OutputFile $OutputFile -hourdirection $hrdirection -hoursago $hoursago -FilterApp $FilterApp -CheckFor $CheckFor -CheckForExt $CheckForExt -TempUFAll $TempUFAll -CheckForSizeMin $CheckForSizeMin -CheckForSizeMax $CheckForSizeMax -CheckHidden $CheckHidden -ScanFilterfn $ScanFilterfn -FilterPat $filterpatstr 
-
-# Do the scan and get the results with multiple threads to improve time taken
-Invoke-DriveScan -Drives $drivestoscan -OutputFile $OutputFile -hourdirection $hrdirection -hoursago $hoursago -FilterApp $FilterApp -CheckFor $CheckFor -CheckForExt $CheckForExt -TempUFAll $TempUFAll -CheckForSizeMin $CheckForSizeMin -CheckForSizeMax $CheckForSizeMax -CheckHidden $CheckHidden -ScanFilterfn $ScanFilterfn -FilterPat $filterpatstr 
+# Do the scan
+if ($SingleThreaded -eq 'Y') {
+    Invoke-DriveScan -Drives $drivestoscan -OutputFile $OutputFile -hourdirection $hrdirection -hoursago $hoursago -FilterApp $FilterApp -CheckFor $CheckFor -CheckForExt $CheckForExt -TempUFAll $TempUFAll -CheckForSizeMin $CheckForSizeMin -CheckForSizeMax $CheckForSizeMax -CheckHidden $CheckHidden -ScanFilterfn $ScanFilterfn -FilterPat $filterpatstr 
+} else {
+    # Do the scan and get the results with multiple threads to improve time taken
+    Invoke-DriveScanMT -Drives $drivestoscan -OutputFile $OutputFile -hourdirection $hrdirection -hoursago $hoursago -FilterApp $FilterApp -CheckFor $CheckFor -CheckForExt $CheckForExt -TempUFAll $TempUFAll -CheckForSizeMin $CheckForSizeMin -CheckForSizeMax $CheckForSizeMax -CheckHidden $CheckHidden -ScanFilterfn $ScanFilterfn -FilterPat $filterpatstr 
+}
 
 # add a summary of directory counts to the output
 showdircountsinfile -OutputFile $OutputFile -ShowDirCounts $ShowDirCounts
