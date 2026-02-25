@@ -35,7 +35,7 @@
 # FMR: add functional tests
 
 param (
-    [string]$SingleThreaded,       # Y means run process in single thread, useful for debugging. Only prompted for if debugger detected and not specified. Default is Y
+    [string]$SingleThreaded,       # Y means run process in single thread, useful for debugging. Only prompted for if debugger detected and not specified. Defaults to Y if debugger otherwise N
     [string]$ModDefault,           # Y means the below changes the default rather than passes the value, default is N
     [string]$CleanTempFiles,       # Y if want to run windows cleanmgr before running scan, default is N
     [double]$HoursToCheck,         # Number of hours to look back for changes, default is -3, note this can have a decimal point e.g. -0.5 (last half-hour). If postive looks for changed files before specified hours.
