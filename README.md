@@ -77,13 +77,13 @@ The script will ask for all the options, or they can be passed as switches on th
 | `EXE`     | BAT, PS1, BIN, CMD, COM, CPL, EXE, GADGET, INF1, INS, INX, ISU, JOB, JSE, LNK, MSC, MSI, MSP, MST, PAF, PIF, PS1, REG, RGS, SCR, SCT, SHB, SHS, U3P, VB, VBE, VBS, VBSCRIPT, WS, WSF, WSH |
 | `EXT`     | A single extension to look for as defined in `CheckForExt`. Do not include the `'.'` prefix when specifing  `CheckForExt`. |
 
-### Example 1 - will run with no prompting
+### Example 1 - find all files changed in last 3 hours (no highlited files, no directory roll up counts). Will run without promptin.
 
 `powershell -File "scanforchangeshours_fv2.ps1" -CleanTempFiles N -HoursToCheck -3 -WhichDrive ALL -CheckFor ALL -CheckHidden Y -CheckForSizeMin 0 -CheckForSizeMax -1 -FilterApp N -ShowDirCounts 0 -ShowHighlights Y -HighlightFilter N -CopyHighlights N -CopyMetaInfo N -CopyReportErrors N -FilterZeroLenFiles Y`
 
 ### Example 2 - run with prompting but change one of the defaults
 
-`powershell -File "scanforchangeshours_fv2.ps1" -ModDefault Y -CheckFor IMG `
+`powershell -File "scanforchangeshours_fv2.ps1" -ModDefault Y -CheckFor EXE `
 
 ### Beware
 
