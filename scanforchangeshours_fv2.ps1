@@ -1017,7 +1017,7 @@ function Invoke-DriveScanMT {
 #
 
 # FOR DEBUGGING show details of the enviroment if running under a debugger
-# POWERSHELL oddies, even though checkfordebugger returns a string, the if might not enforce the string type, causing the
+# POWERSHELL oddies, even though checkfordebugger returns a string, it might not enforce the string type, causing the
 # condition not match the string "none" when "none" is returned. So need the $() around the return from checkfordebugger
 $IsDebug = $false
 if ($(checkfordebugger) -ne "none") { $IsDebug = $true; }
