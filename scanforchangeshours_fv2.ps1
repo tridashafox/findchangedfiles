@@ -80,22 +80,24 @@
     Y = Exclude zero-byte files from results. Default: Y
 
 .INPUTS
-    Drive(s) and how for back in hours to look for changes, filtering options, if highlighted files should be copied or filtered.
+    Drive(s) and how for back from now to look or hours since now to start looking from, 
+    filtering options, if highlighted files should be copied.
 
 .OUTPUTS
-    Result file stored in a created directory with name sfc-<date>-<time> in the downloads directory. If copy highlighted files enabled, files also copied into this directory.
+    Result file stored in a created directory with name sfc-<date>-<time> in the downloads 
+    directory. If copy highlighted files enabled, files also copied into this directory.
 
 .EXAMPLE
-    scanforchangeshours_fv2.ps1 -CleanTempFiles N -HoursToCheck -3 -WhichDrive ALL -CheckFor ALL -CheckHidden Y -CheckForSizeMin 0 -CheckForSizeMax -1 -FilterApp N -ShowDirCounts 0 -ShowHighlights Y -HighlightFilter N -CopyHighlights N -CopyMetaInfo N -CopyReportErrors N -FilterZeroLenFiles Y
-    # find all files changed in last 3 hours (no highlited files, no directory roll up counts). Will run without any prompting.
+    Get-Help scanforchangeshours_fv2.ps1 -Full
+    # Show complete help
 
 .EXAMPLE
     scanforchangeshours_fv2.ps1 -ModDefault Y -CheckFor EXE 
     # run with prompting but change one of the defaults
 
 .EXAMPLE
-    Get-Help scanforchangeshours_fv2.ps1 -Full
-    # Show complete help
+    scanforchangeshours_fv2.ps1 -CleanTempFiles N -HoursToCheck -3 -WhichDrive ALL -CheckFor ALL -CheckHidden Y -CheckForSizeMin 0 -CheckForSizeMax -1 -FilterApp N -ShowDirCounts 0 -ShowHighlights Y -HighlightFilter N -CopyHighlights N -CopyMetaInfo N -CopyReportErrors N -FilterZeroLenFiles Y
+    # find all files changed in last 3 hours (no highlited files, no directory roll up counts). Will run without any prompting.
 
 .LINK
     https://github.com/tridashafox/findchangedfiles.git
