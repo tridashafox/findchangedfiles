@@ -69,6 +69,7 @@ The script will ask for all the options, or they can be passed as switches on th
 | CopyMetaInfo       | string | Y to create a JSON file with metadata for each highlighted file.                                                                                               | N       |
 | CopyReportErrors   | string | Y to log errors during ShowHighlights into the results file.                                                                                                   | N       |
 | FilterZeroLenFiles | string | Y to filter out zero length files.                                                                                                                             | Y       |
+| WaitOnExit         | string | Y Wait for enter to be pressed before ending. Not prompted for.                                                                                                | Y       |
 
 `File groups` are sets of extensions not an actual extensions
 | Parameter | Extensions  |
