@@ -79,6 +79,9 @@
 .PARAMETER FilterZeroLenFiles
     Y = Exclude zero-byte files from results. Default: Y
 
+.PARAMETER WaitOnExit
+    Y = whats for a enter to be pressed before exiting. Not prompted for. Default: Y
+
 .INPUTS
     Drive(s) and how for back from now to look or hours since now to start looking from, 
     filtering options, if highlighted files should be copied.
@@ -136,7 +139,8 @@ param (
     [string]$HighlightFilterfn,    # Name of a file which contains a list of directories from which highlighted files excluded
     [string]$CopyMetaInfo,         # Create a json file with info about for each file found by ShowHighlights, default is N
     [string]$CopyReportErrors,     # Report errors during the ShowHighlights operation into the results file, default is N
-    [string]$FilterZeroLenFiles    # Filter out zero length files from the result, default is Y
+    [string]$FilterZeroLenFiles,   # Filter out zero length files from the result, default is Y
+    [string]$WaitOnExit            # Wait for enter to be pressed before ending. Not prompted for, default is Y
 )
 
 ########################################################################
@@ -490,7 +494,7 @@ function doScanfor {
     }
 
     # Only add the -Force flag if requested, slows performance by x3 in worst cases
-    if ($checkforcehidden -eq 'Y') {
+    if ($checkforcehidden -ieq 'Y') {
         $gciParams['Force'] = $true
     }
 
@@ -666,7 +670,7 @@ function findfilestohighlight {
     # print on console number of found files
     $sizeoffnd = $filteredfiles | Measure-Object -Line | Select-Object -ExpandProperty Lines
     $strnfl = "Highlighted # modified or created files "
-     if ($HighlightFilter -eq 'Y') { $strnfl += "(no filter) $sizeoffnd" } else { $strnfl += $sizeoffnd }
+     if ($HighlightFilter -ieq 'Y') { $strnfl += "(no filter) $sizeoffnd" } else { $strnfl += $sizeoffnd }
     Write-Host $strnfl
 
     # get filelist in good format 
@@ -694,7 +698,7 @@ function findfilestohighlight {
     else 
     {
         Add-Content -Path $outfile -Value ""
-        if ($HighlightFilter -eq 'Y') { $filtrtxt = "(filtered)" } else { $filtrtxt = ""}
+        if ($HighlightFilter -ieq 'Y') { $filtrtxt = "(filtered)" } else { $filtrtxt = ""}
         # Don't change the start of this string it's used to locate the end of the scan when creating for the directory counts
         $filteredtitle += "Highlights - Key file types which changed $filtrtxt (exe,bat,pdf,jpg,png,gif,ico,docx,mp4,tiff,webp,afphoto,psd,pic):"
         Add-Content -Path $outfile -Value $filteredtitle -Encoding UTF8
@@ -709,7 +713,7 @@ function findfilestohighlight {
             foreach ($excludeDdg in $filterhlpat) { if ($filename.Length -ge $excludeDdg.Length -and $filename.Substring(0, $excludeDdg.Length) -ieq $excludeDdg) { $shouldSkip = $true; $skippedcnt++; break } }
             if (-not $shouldSkip) { $filterdLines += $line}
         }
-        if ($HighlightFilter -eq 'Y') { Write-Host "Highlighted # modified or created files (after filter)" $filterdLines.Count }
+        if ($HighlightFilter -ieq 'Y') { Write-Host "Highlighted # modified or created files (after filter)" $filterdLines.Count }
         $filterdLines | Add-Content -Path $outfile -Encoding UTF8; 
     }
 
@@ -736,7 +740,7 @@ function findfilestohighlight {
                         catch {
                             $countercpErr++
                             $baseFileName = ''
-                            if ($copyrpterr -eq 'Y') {
+                            if ($copyrpterr -ieq 'Y') {
                                 $notfoundtocopyerror = $filename + " highlighted file could not be copied due failed to get item. "+ $filename + " Error: $_" 
                                 Add-Content -Path $outfile -Value $notfoundtocopyerror -Encoding UTF8
                             }
@@ -756,14 +760,14 @@ function findfilestohighlight {
                                 } 
                                 catch [System.UnauthorizedAccessException] {
                                     $countercpErr++
-                                    if ($copyrpterr -eq 'Y') {
+                                    if ($copyrpterr -ieq 'Y') {
                                         $notfoundtocopyerror = $filename + " highlighted file could not be copied due to System.UnauthorizedAccessException"
                                         Add-Content -Path $outfile -Value $notfoundtocopyerror -Encoding UTF8
                                     }
                                 }
                                 catch [System.IO.PathTooLongException] {
                                     $countercpErr++
-                                    if ($copyrpterr -eq 'Y') {
+                                    if ($copyrpterr -ieq 'Y') {
                                         $notfoundtocopyerror = "$filename could not be copied due to PathTooLongException (exceeds MAX_PATH)"
                                         Add-Content -Path $outfile -Value $notfoundtocopyerror -Encoding UTF8
                                     }
@@ -771,7 +775,7 @@ function findfilestohighlight {
                             }
 
                             # create the meta data file
-                            if ($CopyMetaInfo -eq 'Y')
+                            if ($CopyMetaInfo -ieq 'Y')
                             {
                                 try {
                                     $srcfileInfo = Get-Item $filename
@@ -789,7 +793,7 @@ function findfilestohighlight {
                                 } 
                                 catch {
                                     $countercpErr++
-                                    if ($copyrpterr -eq 'Y') {
+                                    if ($copyrpterr -ieq 'Y') {
                                         $notfoundtocopyerror = $filename + " highlighted file meta data could not be copied due to $($_.Exception.Message)"
                                         Add-Content -Path $outfile -Value $notfoundtocopyerror -Encoding UTF8
                                     }
@@ -799,7 +803,7 @@ function findfilestohighlight {
                     }
                     else {
                         $countercpErr++
-                        if ($copyrpterr -eq 'Y') {
+                        if ($copyrpterr -ieq 'Y') {
                             $notfoundtocopyerror = $filename + " highlighted file could not be copied due no longer found on system"
                             Add-Content -Path $outfile -Value $notfoundtocopyerror -Encoding UTF8
                         }
@@ -1016,8 +1020,11 @@ $dwdir = (New-Object -ComObject Shell.Application).NameSpace('shell:Downloads').
 $Drives = Get-CimInstance -ClassName Win32_LogicalDisk -Filter "DriveType=3" | ForEach-Object { "$($_.DeviceID)" }
 $OutputFile = $dwdir + "\result.txt"
 $ExtsToHilight = @(".exe", ".bat", ".pdf", ".jpg", ".png", ".gif", ".ico", ".docx", ".mp4", ".tif", ".tiff", ".webm", ".webp", ".afphoto", ".psd", ".pic", ".jpeg")
-if ($ModDefault -eq "" -or $ModDefault -eq "N") { $ModDefault = $null}
+if ($ModDefault -eq "" -or $ModDefault -ieq "N") { $ModDefault = $null}
 clearpressedkeys
+
+# Option: wait on exist
+if (-not ($WaitOnExit -ieq 'Y' -or $WaitOnExit -ieq 'N')) { $WaitOnExit = 'Y'}
 
 # Options: run in single thread
 if ($IsDebug) { 
@@ -1068,7 +1075,7 @@ if (!$CheckFor -or $ModDefault) {
     }
 } elseif ($CheckFor -notin $validCftypes) { Write-Host "Invalid CheckFor option. Must be one of $validCftypes." -ForegroundColor Red; waitbeforeexit }
 
-if ($CheckFor -eq 'EXT') {
+if ($CheckFor -ieq 'EXT') {
     if (!$CheckForExt -or $ModDefault) {
         if ($ModDefault -and $CheckForExt) { $defval = $CheckForExt } else { $defval = "EXE" }
         $CheckForExt = $(Read-Host "Which extension do you want to checkfor (don't include a '.')?: [default $defval]").ToUpper()
@@ -1145,19 +1152,19 @@ if ($HoursToCheck -lt 0) {
     $hrdirection = "before";
 }
 
-$msgsng = if ($SingleThreaded -eq 'Y') {"(single threaded)"} else {""}
-$msghid = if ($CheckHidden -eq 'Y') { "including hidden files" } else { "excluding hidden files" }
+$msgsng = if ($SingleThreaded -ieq 'Y') {"(single threaded)"} else {""}
+$msghid = if ($CheckHidden -ieq 'Y') { "including hidden files" } else { "excluding hidden files" }
 $maxmsg = if ($CheckForSizeMax -eq '-1') { "no maximum size" } else { "maximum size $CheckForSizeMax bytes" }
-$msgflt = if ($FilterApp -eq 'Y') { "filter applied using $ScanFilterfn" } else { "no filter applied" }
+$msgflt = if ($FilterApp -ieq 'Y') { "filter applied using $ScanFilterfn" } else { "no filter applied" }
 $msgdcs = if ($ShowDirCounts -gt 0) {"shown with max depth $ShowDirCounts"} else { "not shown"}
-$metaCt = if ($CopyMetaInfo -eq 'Y') { "will be created" } else { "will not be created" }
-$msgchi = if ($CopyHighlights -eq 'Y') { "and will be copied to an output directory"} else { "only" }
-$msgext = if ($CheckFor -eq 'EXT') { "Extension .$CheckForExt" } else { "" }
-$msgflc = if ($HighlightFilter -eq 'Y') { "filter applied using $HighlightFilterFn" } else { "no filter applied" }
-$msgzfn = if ($FilterZeroLenFiles -eq 'Y') {"yes"} else {"no"}
+$metaCt = if ($CopyMetaInfo -ieq 'Y') { "will be created" } else { "will not be created" }
+$msgchi = if ($CopyHighlights -ieq 'Y') { "and will be copied to an output directory"} else { "only" }
+$msgext = if ($CheckFor -ieq 'EXT') { "Extension .$CheckForExt" } else { "" }
+$msgflc = if ($HighlightFilter -ieq 'Y') { "filter applied using $HighlightFilterFn" } else { "no filter applied" }
+$msgzfn = if ($FilterZeroLenFiles -ieq 'Y') {"yes"} else {"no"}
 
 Write-Host "`n[INFO] Scanning using values" -ForegroundColor Green
-if ($WhichDrive -eq 'ALL') { Write-Host " - Drives: $Drives $msgsng" } else { Write-Host " - Drives: $WhichDrive $msgsng"}
+if ($WhichDrive -ieq 'ALL') { Write-Host " - Drives: $Drives $msgsng" } else { Write-Host " - Drives: $WhichDrive $msgsng"}
 Write-Host " - Look for files modified $hrdirection $hoursago"
 Write-Host " - File types: $CheckFor" $msgext
 Write-Host " - Hidden files: $msghid"
@@ -1166,7 +1173,7 @@ Write-Host " - Filter scan: $msgflt"
 Write-Host " - Directory summary counts: $msgdcs"
 Write-Host " - Filtering zero length files: $msgzfn"
 
-if ($ShowHighlights -eq 'Y') {
+if ($ShowHighlights -ieq 'Y') {
     Write-Host "`n[INFO] Highlighting enabled..." -ForegroundColor Green
     Write-Host " - Extensions highlighted: $ExtsToHilight"
     Write-Host " - Files modified $hrdirection $hoursago will be reported" $msgchi
@@ -1184,12 +1191,12 @@ if ( $WhichDrive -ne 'ALL') { $drivestoscan = @($WhichDrive + ":") } else { $dri
 
 # TODO use the drive being scanned to filter out patterns not applicible in the buildfilter function
 # Build filter pattern 
-if ($FilterApp -eq 'Y')          { $filterpatstr = buildfilterpatern -ExcludeFilelist $ScanFilterfn -FilterZeroLenfn $FilterZeroLenFiles } else { $filterpatstr = "" }
-if ($FilterZeroLenFiles -eq 'Y') { $filterpatstr = buildfilterpatZfn -Filterpat $filterpatstr }
+if ($FilterApp -ieq 'Y')          { $filterpatstr = buildfilterpatern -ExcludeFilelist $ScanFilterfn -FilterZeroLenfn $FilterZeroLenFiles } else { $filterpatstr = "" }
+if ($FilterZeroLenFiles -ieq 'Y') { $filterpatstr = buildfilterpatZfn -Filterpat $filterpatstr }
 if ($HighlightFilter -ieq 'Y')   { $filterhlpat  = buildfilterarray -ExcludeFilelist $HighlightFilterfn } else { $filterhlpat = @() }
 
 # Do the scan, single or multi-threaded
-if ($SingleThreaded -eq 'Y') {
+if ($SingleThreaded -ieq 'Y') {
     Invoke-DriveScan -Drives $drivestoscan -OutputFile $OutputFile -hourdirection $hrdirection -hoursago $hoursago -FilterApp $FilterApp -CheckFor $CheckFor -CheckForExt $CheckForExt -TempUFAll $TempUFAll -CheckForSizeMin $CheckForSizeMin -CheckForSizeMax $CheckForSizeMax -CheckHidden $CheckHidden -ScanFilterfn $ScanFilterfn -FilterPat $filterpatstr 
 } else {
     Invoke-DriveScanMT -Drives $drivestoscan -OutputFile $OutputFile -hourdirection $hrdirection -hoursago $hoursago -FilterApp $FilterApp -CheckFor $CheckFor -CheckForExt $CheckForExt -TempUFAll $TempUFAll -CheckForSizeMin $CheckForSizeMin -CheckForSizeMax $CheckForSizeMax -CheckHidden $CheckHidden -ScanFilterfn $ScanFilterfn -FilterPat $filterpatstr 
@@ -1225,4 +1232,4 @@ if (Test-Path $OutputFile) {
     relocateoutput -OutputFile $OutputFile -resfldpath $resfldpath -fndirsep $fndirsep
 }
 
-waitbeforeexit
+if ($WaitOnExit -ieq 'Y') { waitbeforeexit } else { clearpressedkeys }
