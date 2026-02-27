@@ -95,7 +95,8 @@ The script will ask for all the options, or they can be passed as switches on th
   ```powershell
   Write-Host $($PSVersionTable.PSVersion)
   ```
-- See the top of the scanforchangeshours_fv2.ps1  for more notes.
+- See the top of the scanforchangeshours_fv2.ps1 for more notes.
+- This project does not have dedicated support. Any issues are unlikely to be fixed in a timely fashion
 
 ## Update History
 
