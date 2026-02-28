@@ -69,6 +69,7 @@ The script will ask for all the options, or they can be passed as switches on th
 | CopyMetaInfo       | string | Y to create a JSON file with metadata for each highlighted file.                                                                                               | N       |
 | CopyReportErrors   | string | Y to log errors during ShowHighlights into the results file.                                                                                                   | N       |
 | FilterZeroLenFiles | string | Y to filter out zero length files.                                                                                                                             | Y       |
+| WaitOnExit         | string | Y Wait for enter to be pressed before ending. Not prompted for.                                                                                                | Y       |
 
 `File groups` are sets of extensions not an actual extensions
 | Parameter | Extensions  |
@@ -87,14 +88,6 @@ The script will ask for all the options, or they can be passed as switches on th
 `powershell -File "scanforchangeshours_fv2.ps1" -ModDefault Y -CheckFor EXE `
 
 ### Notes
-
-> After Win11 H2 update, PowerShell scripts may not run by default.  
-> You must open a PowerShell terminal to run scripts with bypassed execution policy, or use a batch file or Visual Studio Code.
-
-```
-powershell -ExecutionPolicy ByPass -File scanforchangeshours_fv2.ps1
-```
-
 - **Processing Hidden Files:** Script can be up to 3x slower when including hidden files, especially if not running as admin (access denied errors).
 - **Result Folders:** If you run the script multiple times without deleting previous results, the output may be scanned again. This is intentional.
 - **PowerShell Version:** Only works reliably with **PowerShell 5.1**, due to threading issues in 7.x.  
@@ -102,7 +95,8 @@ powershell -ExecutionPolicy ByPass -File scanforchangeshours_fv2.ps1
   ```powershell
   Write-Host $($PSVersionTable.PSVersion)
   ```
-- See the top of the scanforchangeshours_fv2.ps1  for more notes.
+- See the top of the scanforchangeshours_fv2.ps1 for more notes.
+- This project does not have dedicated support. Any issues are unlikely to be fixed in a timely fashion
 
 ## Update History
 
