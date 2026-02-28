@@ -205,8 +205,8 @@ function showscanduration {
         $duration = $Result.EndT - $Result.StartT
         #$middur = $Result.MidT - $Result.StartT
         #Write-Host $middur, $duration, $Result.Path
-        $durStr = $duration.TotalSeconds.ToString("N3")
-        "Time taken: $($Result.Path) $durStr"
+        $durStr = $duration.TotalSeconds.ToString("N3").PadLeft(7)
+        "Time taken: $durStr $($Result.Path)"
     }
 }
 
