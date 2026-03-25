@@ -505,8 +505,8 @@ function doScanfor {
 
     # Base filter
     $hx = ($hrdir -eq "after") 
-    if ($hx) { $timeFilter = { $_.LastWriteTime -gt $hago -and $_.Length -ge $minSize } }
-    else     { $timeFilter = { $_.LastWriteTime -lt $hago -and $_.Length -ge $minSize } }
+    if ($hx) { $timeFilter = { ($_.LastWriteTime -gt $hago -and $_.Length -ge $minSize) -or  ($_.CreationTime -gt $hago -and $_.Length -ge $minSize) } }
+    else     { $timeFilter = { ($_.LastWriteTime -lt $hago -and $_.Length -ge $minSize) -and ($_.CreationTime -lt $hago -and $_.Length -ge $minSize) } }
 
     # Add size limit if maxSize is specified
     if ($maxSize -ne -1) {
