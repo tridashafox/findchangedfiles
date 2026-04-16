@@ -803,7 +803,7 @@ function findfilestohighlight {
                             if ($CopyMetaInfo -ieq 'Y' -or $CopyMetaInfo -ieq 'S')
                             {
                                 try {
-                                    $srcfileInfo = Get-Item $filename
+                                    $srcfileInfo = Get-Item $filename -Force
                                     $meta = [ordered]@{  # note the ordered specifier otherwise entries are come out random
                                         originalPath1     = $fullPathStr
                                         originalPath2     = $fullPathStr.Replace("\", "/")
