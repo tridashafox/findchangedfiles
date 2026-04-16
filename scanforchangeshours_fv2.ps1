@@ -1263,4 +1263,9 @@ if (Test-Path $OutputFile) {
     relocateoutput -OutputFile $OutputFile -resfldpath $resfldpath -fndirsep $fndirsep
 }
 
+if (Test-Path $TempUFAll) {
+    Remove-Item $TempUFAll -Force
+}
+
+
 if ($WaitOnExit -ieq 'Y') { waitbeforeexit } else { clearpressedkeys }
