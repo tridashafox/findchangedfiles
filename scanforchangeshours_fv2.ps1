@@ -71,7 +71,7 @@
     Text file with directories to exclude from highlight copy (when HighlightFilter=Y)
 
 .PARAMETER CopyMetaInfo
-    Y = Create JSON metadata file for copied highlights. Default: N
+    S means put json file info in ntfs stream for each file found by ShowHighlights. Y Creates a json file {fn}.meta.json, default is N (none)
 
 .PARAMETER CopyReportErrors
     Y = Log highlight copy errors to results. Default: N
@@ -137,7 +137,7 @@ param (
     [string]$CopyHighlights,       # Copy files found by ShowHighlights to a temp directory in downloads, default is N
     [string]$HighlightFilter,      # Y means apply filter to the highlighted files from specific directories.
     [string]$HighlightFilterfn,    # Name of a file which contains a list of directories from which highlighted files excluded
-    [string]$CopyMetaInfo,         # Create a json file with info about for each file found by ShowHighlights, default is N
+    [string]$CopyMetaInfo,         # S means put json file info in ntfs stream for each file found by ShowHighlights. Y Creates a json file {fn}.meta.json, default is N (none)
     [string]$CopyReportErrors,     # Report errors during the ShowHighlights operation into the results file, default is N
     [string]$FilterZeroLenFiles,   # Filter out zero length files from the result, default is Y
     [string]$WaitOnExit            # Wait for enter to be pressed before ending. Not prompted for, default is Y
@@ -322,6 +322,31 @@ function getYNinput {
     } elseif ($InitValue -eq 'Y' -or $InitValue -eq 'N') { return $InitValue }
 
     Write-Host "Invalid option for $Name. Must be Y or N" -ForegroundColor Red 
+    waitbeforeexit
+}
+
+function getYNSinput {
+    param (
+        $ModDefault,    # don't type as string, we need to know if it is $null, if it's typed it will end up ""
+        $InitValue,     # don't type as string
+        [string]$Name,
+        [string]$Prompt,
+        [string]$Default = 'N'
+    )
+
+    if (!$InitValue -or $ModDefault) {
+        if ($ModDefault -and $InitValue) { $Default = $InitValue } else { $Default = $Default.ToUpper().Trim() }
+        if ($Default -ne "Y" -and $Default -ne "N" -and $Default -ne "S") { $Default = "N" }
+        $question = $Prompt + " (Y/S/N): [default " + $Default + "]"
+        while ($true) {
+            $response = (Read-Host $question).ToUpper().Trim()
+            if (-not $response) { return $Default }
+            if ($response -eq 'Y' -or $response -eq 'N' -or $response -eq 'S') { return $response } 
+            Write-Host "Invalid option. Enter Y, S or N" -ForegroundColor Red 
+        }
+    } elseif ($InitValue -eq 'Y' -or $InitValue -eq 'N' -or $InitValue -eq 'S') { return $InitValue }
+
+    Write-Host "Invalid option for $Name. Must be Y, S or N" -ForegroundColor Red 
     waitbeforeexit
 }
 
@@ -775,7 +800,7 @@ function findfilestohighlight {
                             }
 
                             # create the meta data file
-                            if ($CopyMetaInfo -ieq 'Y')
+                            if ($CopyMetaInfo -ieq 'Y' -or $CopyMetaInfo -ieq 'S')
                             {
                                 try {
                                     $srcfileInfo = Get-Item $filename
@@ -789,7 +814,13 @@ function findfilestohighlight {
                                         lastmodifed       = $((New-TimeSpan -Start $srcfileInfo.LastWriteTime).TotalMinutes).ToString("N2") + " mins"
                                         copiedOn          = (Get-Date).ToString("o")
                                     }
-                                    $meta | ConvertTo-Json | Set-Content -Path "$newFileName.meta.json" -Encoding UTF8
+                                    if ($CopyMetaInfo -ieq 'Y') {
+                                        $meta | ConvertTo-Json | Set-Content -Path "$newFileName.meta.json" -Encoding UTF8
+                                    } 
+                                    else {
+                                        $json = $meta | ConvertTo-Json
+                                        Set-Content -Path $newFileName -Stream ".meta" -Value $json
+                                    }
                                 } 
                                 catch {
                                     $countercpErr++
@@ -1120,7 +1151,7 @@ if ($ShowHighlights -ieq 'Y') {
 
     if ($CheckFor -ieq 'ALL') { $inyndef =  'N' } else { $inyndef =  'Y' }
     $CopyHighlights   = getYNinput $ModDefault $CopyHighlights   "CopyHighlights"   "Copy highlighted files to an output directory?" $inyndef 
-    $CopyMetaInfo     = getYNinput $ModDefault $CopyMetaInfo     "CopyMetaInfo"     "Create a [fn].meta.json with path info for each copied highlighted file an output directory?" 'N'
+    $CopyMetaInfo     = getYNSinput $ModDefault $CopyMetaInfo    "CopyMetaInfo"     "Creates Json info for highlighted. Y [fn].meta.info. S info in :.meta ntfs stream?" 'N'
     $CopyReportErrors = getYNinput $ModDefault $CopyReportErrors "CopyReportErrors" "Report errors when copying highlighted files to an output directory?" 'N'
 } else { 
     $CopyHighlights = 'N'
@@ -1157,7 +1188,7 @@ $msghid = if ($CheckHidden -ieq 'Y') { "including hidden files" } else { "exclud
 $maxmsg = if ($CheckForSizeMax -eq '-1') { "no maximum size" } else { "maximum size $CheckForSizeMax bytes" }
 $msgflt = if ($FilterApp -ieq 'Y') { "filter applied using $ScanFilterfn" } else { "no filter applied" }
 $msgdcs = if ($ShowDirCounts -gt 0) {"shown with max depth $ShowDirCounts"} else { "not shown"}
-$metaCt = if ($CopyMetaInfo -ieq 'Y') { "will be created" } else { "will not be created" }
+$metaCt = if ($CopyMetaInfo -ieq 'Y') { "will be created as [f].meta.json" } elseif ($CopyMetaInfo -ieq 'N') { "will not be created" } else { "will be created in ntfs .meta stream" }
 $msgchi = if ($CopyHighlights -ieq 'Y') { "and will be copied to an output directory"} else { "only" }
 $msgext = if ($CheckFor -ieq 'EXT') { "Extension .$CheckForExt" } else { "" }
 $msgflc = if ($HighlightFilter -ieq 'Y') { "filter applied using $HighlightFilterFn" } else { "no filter applied" }
@@ -1177,7 +1208,7 @@ if ($ShowHighlights -ieq 'Y') {
     Write-Host "`n[INFO] Highlighting enabled..." -ForegroundColor Green
     Write-Host " - Extensions highlighted: $ExtsToHilight"
     Write-Host " - Files modified $hrdirection $hoursago will be reported" $msgchi
-    Write-Host " - meta.json files for each highlighted file:" $metaCt
+    Write-Host " - meta.json for each highlighted file:" $metaCt
     Write-Host " - Filter highlighted files: $msgflc"
 }
 
