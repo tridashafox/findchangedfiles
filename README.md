@@ -66,7 +66,7 @@ The script will ask for all the options, or they can be passed as switches on th
 | CopyHighlights     | string | Y to copy highlighted files to a temporary directory in Downloads.                                                                                             | N       |
 | HighlightFilter    | string | Y to apply a filter excluding certain directories from highlighted files.                                                                                      | N       |
 | HighlightFilterfn  | string | File name with list of directories to exclude from highlighted results.                                                                                        | —       |
-| CopyMetaInfo       | string | Y to create a JSON file with metadata for each highlighted file.                                                                                               | N       |
+| CopyMetaInfo       | string | Y Create a [f].meta.json file with info about for each file found by ShowHighlights, S creates an [fn]:.meta ntfs stream, default is N                         | N       |
 | CopyReportErrors   | string | Y to log errors during ShowHighlights into the results file.                                                                                                   | N       |
 | FilterZeroLenFiles | string | Y to filter out zero length files.                                                                                                                             | Y       |
 | WaitOnExit         | string | Y Wait for enter to be pressed before ending. Not prompted for.                                                                                                | Y       |
