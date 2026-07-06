@@ -15,7 +15,7 @@
     - Analyze app installation changes
 
     Lists of directories to filter out in both the scan and the copy operation can be provided in a .txt file 
-    with one directory listed per line. Use trailling '\' for exact match or omit this for part match.
+    with one directory listed per line. Uses trailling '\' for exact match or omit this for part match.
 
 .PARAMETER SingleThreaded
     Y = Run in single thread (debugging). Auto-prompts if debugger detected. Default: Y (debugger) / N (normal)
@@ -501,7 +501,7 @@ function doScanfor {
     $wildc = ''
 
     # set up the extensions to look for if looking for images or executables.
-    if ( $exttochk -ieq 'IMG' ) { $wildc = "*.BMP", "*.GIF", "*.JPG", "*.JPEG", "*.PNG", "*.TIF", "*.TIFF", "*.ICO" , "*.DDS", "*.MP4", "*.MOV", "*.WebM", "*.AVI", "*.WMV", "*.Webm", "*.Webp", "*.afphoto", "*.psd", "*.pic" } 
+    if ( $exttochk -ieq 'IMG' ) { $wildc = "*.BMP", "*.GIF", "*.JPG", "*.JPEG", "*.PNG", "*.PDF", "*.TIF", "*.TIFF", "*.ICO" , "*.DDS", "*.MP4", "*.MOV", "*.WebM", "*.AVI", "*.WMV", "*.Webm", "*.Webp", "*.afphoto", "*.psd", "*.pic" } 
     if ( $exttochk -ieq 'EXT' ) { $wildc = "*." + $exttochkact }
     if ( $exttochk -ieq 'EXE' ) { $wildc = "*.BAT", "*.PS1", "*.BIN", "*.CMD", "*.COM", "*.CPL", "*.EXE", "*.GADGET", "*.INF1", "*.INS",`
          "*.INX", "*.ISU", "*.JOB", "*.JSE", "*.LNK", "*.MSC", "*.MSI", "*.MSP", "*.MST", "*.PAF", "*.PIF", "*.PS1", "*.REG", "*.RGS", `
